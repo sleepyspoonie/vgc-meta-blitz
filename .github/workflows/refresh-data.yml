@@ -1,0 +1,31 @@
+name: Refresh meta data
+
+on:
+  schedule:
+    # 03:00 UTC nightly ≈ 8pm Pacific / 11pm Eastern. Adjust to taste.
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}   # lets you trigger a pull manually from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Pull latest usage data from Pikalytics
+        run: node scripts/fetch-data.mjs
+
+      - name: Commit data.json if it changed
+        run: |
+          git config user.name "meta-drill-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data.json
+          git diff --cached --quiet || git commit -m "data: nightly Pikalytics refresh"
+          git push
