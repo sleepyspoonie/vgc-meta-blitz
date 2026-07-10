@@ -1,9 +1,7 @@
 # Meta Drill
 
-Spaced-repetition flashcards for learning the current VGC meta, built on
-nightly Pikalytics usage data. Supports Scarlet & Violet and Pokémon
-Champions, configurable by number of top Pokémon, base stats (all or a
-single stat), common moves, natures, items, and abilities.
+Spaced-repetition flashcards and quiz games for learning the Pokémon
+Champions competitive meta, built on nightly Pikalytics usage data.
 
 ## How it works
 
@@ -11,88 +9,65 @@ single stat), common moves, natures, items, and abilities.
   load from CDNs, so GitHub Pages serves it as-is.
 - `data.json` — the meta snapshot the app reads at load time.
 - `scripts/fetch-data.mjs` — pulls fresh usage data from Pikalytics'
-  AI-readable endpoints and rewrites `data.json`.
+  AI-readable endpoints and rewrites `data.json`. Covers the top 50
+  Pokémon per regulation; the study slider sizes itself to the data.
+  It also checks every ranked Pokémon for Mega form varieties on PokéAPI
+  and attaches their stats, types, and ability, so Megas appear as their
+  own entries in the drills. Champions-exclusive Megas that PokéAPI
+  doesn't know yet are skipped with a warning and retried nightly.
 - `.github/workflows/refresh-data.yml` — runs that script nightly
   (03:00 UTC) and commits the result. Pages redeploys automatically.
 
-If a pull fails (site change, format rotation), the workflow fails loudly
-and the last good `data.json` keeps serving — the app never breaks.
+The current-regulation slug rotates with seasons (e.g.
+`battledataregmbs3`), so the script auto-detects it from
+`/ai/pokedex` on every run. Each regulation is pulled independently: if
+one fails, its previous data is carried forward and the others still
+refresh. The run only fails outright if nothing could be refreshed.
 
 ## Deploy (one time, ~3 minutes)
 
-1. Create a GitHub repo and push these files (or upload them via the web UI).
+1. Create a public GitHub repo and push these files.
 2. **Settings → Pages** → Source: *Deploy from a branch* → `main` / root.
-3. **Actions tab** → enable workflows → open *Refresh meta data* →
-   **Run workflow** once manually. This replaces the seed snapshot with a
-   fresh pull that includes exact usage percentages.
-4. Done. Your app lives at `https://<you>.github.io/<repo>/` and the data
-   refreshes itself every evening.
+3. **Settings → Actions → General → Workflow permissions** → *Read and
+   write permissions*.
+4. **Actions tab** → *Refresh meta data* → **Run workflow** once. This
+   replaces the seed snapshot with a fresh pull including exact usage
+   percentages, natures, Reg M-A, and the top 50.
+5. Your app lives at `https://<you>.github.io/<repo>/` and refreshes
+   itself every evening.
 
-## When a regulation rotates
+## What to drill
 
-Format slugs live in the `FORMATS` array at the top of
-`scripts/fetch-data.mjs`. Current slugs are listed at
-`https://www.pikalytics.com/llms.txt`. Update the slug and label, commit,
-and the next nightly run picks it up. (Or just ask Claude to do it.)
+All drills share the pool config: regulation, top-N slider, and a
+**Mega selector** (Include Megas / No Megas / Megas only, detected from
+Mega Stones in the item data).
 
-## Modes
+| Drill | How it plays |
+|-------|--------------|
+| Base Stat Quiz | Flip cards for one stat (default Speed, with speed-tier context on reveal) |
+| Speed Tier Simulator | 1v1 duels or 2v2 turn order with win targets, streaks, and an optional Hard Mode (Scarf ×1.5, Tailwind ×2, PAR ×0.5, weather + Swift Swim/Chlorophyll/Sand Rush/Slush Rush ×2, Trick Room reversal, optional ±Spe natures). Weather setters put their weather up 50% of the time. |
+| Common Movesets Quiz | The mon's tracked moves, shuffled — select every move over 30% usage |
+| Common Items Quiz | 8 items (the mon's own + distractors from other mons) — select everything over 10% usage |
+| Preferred Abilities Quiz | Multiple choice — pick the mon's most common ability |
+| Preferred Natures Quiz | Flip cards from ladder data |
+| Physically or Specially Offensive Quiz | Physical, special, or mixed attacker? (within 10 base points = mixed) |
+| Physically or Specially Defensive Quiz | Physically or specially bulkier? |
+| Supereffective Type Matchup Quiz | Generic monotype drill — given an attacking type, select every type it hits super effectively |
+| Resisted Type Matchup Quiz | Given a defending type, select every attacking type it resists (immunities included) |
+| Nature Types Quiz | All 25 natures' +10%/−10% effects |
 
-**Flashcards** — spaced-repetition drilling of one category at a time:
-a single base stat (default Speed), natures, items, abilities, the
-format-independent **Nature chart** (25 cards covering every nature's
-+10%/−10% effects), or the **Moves game** — the mon's tracked moves are
-shown shuffled and you select every move with over 30% usage. This game
-requires real usage percentages, so it stays locked until the first
-data pull populates them. The nightly pull covers the top 50
-Pokémon per format; the study slider sizes itself to the data.
+Quizzes with checkable answers grade themselves: a correct answer clears
+the card, a miss requeues it until you get it right. Only the flip-card
+drills (Base Stat, Preferred Natures, Nature Types) use Anki-style
+self-rating.
 
-**Speed Game** — pick a win target (5/10/15/25), then choose a variant:
-*1v1 Duel* (two random mons from your top-N pool, pick the faster by
-base Speed — speed ties are a legal answer) or *2v2 Turn Order* (a full
-doubles field of four; tap them in move order, fastest first, with tied
-Pokémon accepted in either order). Turn Order has a **Hard Mode** that
-layers on real speed control — Choice Scarf (×1.5), Tailwind (×2 for one
-side), paralysis (×0.5), weather with speed abilities (Swift Swim in
-rain, Chlorophyll in sun, Sand Rush in sandstorm, Slush Rush in snow —
-all ×2), and Trick Room, which reverses the whole order. Weather can
-also be put up by a setter on the field — Drizzle, Drought, Snow
-Warning, Sand Stream/Spit, Orichalcum Pulse — and the banner credits
-them (e.g. "Snow · Ninetales-Alola's Snow Warning"), so sandstorm and
-snow rounds appear organically whenever setters or abusers are in your
-studied pool. A fielded setter's weather is only up 50% of the time —
-weather goes down in real games too.
+The Mega selector expands the pool with actual Mega forms (Include
+Megas), hides them (No Megas), or drills only them (Megas only).
 
-Hard Mode also has an optional **± Speed natures** sub-toggle. Only
-speed-relevant natures are dealt, so every chip on the field changes
-the answer: roughly a third of Pokémon get a +Spe nature (Jolly, Timid,
-Hasty, Naive — ×1.1), a third get a −Spe nature (Brave, Quiet, Relaxed,
-Sassy — ×0.9), and the rest show no chip (neutral). The multiplier
-applies to the stat before item/field multipliers. (Snow is Gen 9's replacement for hail — same blizzard
-weather.) Every modifier is shown on the
-field, the reveal shows the math per Pokémon, and the round generator
-guarantees at least one modifier that actually changes the answer.
-(Not modeled: Protosynthesis/Quark Drive speed boosts, Unburden, and
-stat stages.) Wrong answers don't count toward your total, and streaks
-are tracked.
+Games that need usage percentages (moves, items) stay locked until the
+first data pull populates them.
 
-Pokémon Champions is the default format; switch to Scarlet & Violet on
-the config screen.
-
-Both modes share the study pool config, including a **Mega toggle**
-(shown for formats where top Pokémon carry Mega Stones) that includes or
-excludes Mega users from the pool. Category availability is data-driven:
-if a snapshot lacks, say, natures for a format, that category shows
-"no data yet" until a nightly pull fills it in.
-
-## Sprites
-
-Pokémon artwork loads at runtime from [PokéAPI](https://pokeapi.co)
-(free, CORS-enabled, no key needed) with a small form-name override map
-for tricky slugs like Calyrex-Shadow → calyrex-shadow-rider. Results are
-cached in memory, and anywhere a sprite can't load, the app falls back
-to type-colored orbs — so the app works fully offline from PokéAPI too.
-
-## Spaced repetition
+## Spaced repetition (flip cards)
 
 In-session Anki-style learning steps, measured in cards rather than days:
 
@@ -106,12 +81,27 @@ In-session Anki-style learning steps, measured in cards rather than days:
 Tuning lives in the `SRS` constant at the top of `app.jsx`.
 Keyboard: space/enter to flip, 1–4 to grade.
 
+## Sprites
+
+Pokémon artwork loads at runtime from [PokéAPI](https://pokeapi.co)
+(free, CORS-enabled, no key needed) with a form-name override map for
+tricky slugs. Anywhere a sprite can't load, the app falls back to
+type-colored orbs.
+
+## Testing the data pull
+
+- **Locally**: `node scripts/fetch-data.mjs` (Node 18+) rewrites
+  `data.json` on demand.
+- **On GitHub**: Actions tab → *Refresh meta data* → *Run workflow*.
+- When a new regulation drops, add its slug to `FORMATS` in the script —
+  current slugs are listed at https://www.pikalytics.com/llms-full.txt
+
 ## A note on being a good citizen
 
-Pikalytics' API is unofficial and the site is community-run and
-ad-supported. This project pulls once per day at ~1 request/second with an
-identifying user-agent, and caches everything. Please keep it that way,
-and consider supporting them.
+Pikalytics' AI endpoints are designed for machine consumption, but the
+site is community-run. This project pulls once per day at ~1
+request/second with an identifying user-agent, and caches everything.
+Please keep it that way, and consider supporting them.
 
 ## Local development
 
