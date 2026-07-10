@@ -11,6 +11,8 @@ Champions competitive meta, built on nightly Pikalytics usage data.
 - `scripts/fetch-data.mjs` — pulls fresh usage data from Pikalytics'
   AI-readable endpoints and rewrites `data.json`. Covers the top 50
   Pokémon per regulation; the study slider sizes itself to the data.
+  Types always come from PokéAPI (the AI pages' matchup sections aren't a
+  reliable source of a mon's own typing).
   It also checks every ranked Pokémon for Mega form varieties on PokéAPI
   and attaches their stats, types, and ability, so Megas appear as their
   own entries in the drills. Champions-exclusive Megas that PokéAPI
@@ -48,12 +50,12 @@ Mega Stones in the item data).
 | Speed Tier Simulator | 1v1 duels, 2v2 turn order, or Find the Scarf (the move order is shown — drag the Scarf onto the hidden holder; rounds regenerate until the answer is unique). Win targets, streaks, and an optional Hard Mode (Scarf ×1.5, Tailwind ×2, PAR ×0.5, weather + Swift Swim/Chlorophyll/Sand Rush/Slush Rush ×2, Trick Room reversal, optional ±Spe natures). Weather setters put their weather up 50% of the time. |
 | Common Movesets Quiz | The mon's tracked moves, shuffled — select every move over 30% usage |
 | Common Items Quiz | 8 items (the mon's own + distractors from other mons) — select everything over 10% usage |
-| Preferred Abilities Quiz | Multiple choice — pick the mon's most common ability |
+| Common Builds Quiz | Multiple choice — pick the mon's real most-common build (nature + EV spread) among builds borrowed from other meta mons. While Pikalytics' nature field is blank (reported bug), options show the EV spread alone and natures slot in automatically once fixed |
+| Preferred Abilities Quiz | Multiple choice — pick the mon's most common ability. Reveals a description of the ability (from PokéAPI). Pokémon with only one tracked ability are skipped by default (toggleable) |
 | Preferred Natures Quiz | Flip cards from ladder data |
 | Physically or Specially Offensive Quiz | Physical, special, or mixed attacker? (within 10 base points = mixed) |
 | Physically or Specially Defensive Quiz | Physically or specially bulkier? |
-| Supereffective Type Matchup Quiz | Generic monotype drill — given an attacking type, select every type it hits super effectively |
-| Resisted Type Matchup Quiz | Given a defending type, select every attacking type it resists (immunities included) |
+| Type Matchup Quiz | Generic monotype drill with two sub-modes: Supereffective (given an attacking type, select every type it hits hard) and Resisted (given a defending type, select every attacking type it resists, immunities included) |
 | Nature Types Quiz | All 25 natures' +10%/−10% effects |
 
 Quizzes with checkable answers grade themselves: a correct answer clears

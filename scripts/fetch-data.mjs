@@ -116,7 +116,6 @@ function parseList(text) {
   return mons;
 }
 
-const TYPE_WORDS = /normal|fire|water|electric|grass|ice|fighting|poison|ground|flying|psychic|bug|rock|ghost|dragon|dark|steel|fairy/g;
 const STAT_MAP = {
   hp: "hp", atk: "atk", attack: "atk", def: "def", defense: "def",
   spa: "spa", "sp. atk": "spa", "sp atk": "spa", "special attack": "spa",
@@ -125,7 +124,7 @@ const STAT_MAP = {
 };
 
 function parseDetail(text) {
-  const out = { moves: [], items: [], abilities: [], natures: [], stats: null, types: null, winrate: null };
+  const out = { moves: [], items: [], abilities: [], natures: [], builds: [], stats: null, types: null, winrate: null };
   let section = null;
   for (const raw of text.split("\n")) {
     const line = raw.trim();
@@ -137,7 +136,6 @@ function parseDetail(text) {
         t.includes("item") ? "items" :
         t.includes("abilit") ? "abilities" :
         t.includes("nature") ? "natures" :
-        (t.includes("type") && !t.includes("tera")) ? "types" :
         (t.includes("stat") && !t.includes("usage")) ? "stats" : null;
       continue;
     }
@@ -146,12 +144,7 @@ function parseDetail(text) {
       if (wr && out.winrate == null) out.winrate = +wr[1];
       continue;
     }
-    if (section === "types") {
-      if (!out.types) {
-        const words = line.toLowerCase().match(TYPE_WORDS);
-        if (words) out.types = [...new Set(words)].slice(0, 2);
-      }
-    } else if (section === "stats") {
+    if (section === "stats") {
       const slash = line.match(/(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)/);
       if (slash) {
         out.stats = { hp: +slash[1], atk: +slash[2], def: +slash[3], spa: +slash[4], spd: +slash[5], spe: +slash[6] };
@@ -176,6 +169,12 @@ function parseDetail(text) {
       out.natures.push({ name: nat[1], pct: +nat[2] });
     }
   }
+  // The top build: "features a **Jolly** nature with an EV spread of
+  // `2/32/0/0/0/32`. This configuration accounts for 32.7% of ..."
+  // The nature is currently blank ("****") on Champions pages — a reported
+  // Pikalytics bug — so it's stored as null until they fix it.
+  const b = text.match(/features an? \*{0,2}([A-Za-z]*)\*{0,2} nature with an EV spread of `?([\d\/]+)`?[\s\S]{0,200}?(\d+(?:\.\d+)?)\s*%/i);
+  if (b) out.builds.push({ nature: b[1] || null, evs: b[2], pct: +b[3] });
   return out;
 }
 
@@ -216,20 +215,25 @@ const FORM_SLUG_OVERRIDES = {
   "mimikyu": "mimikyu-disguised",
 };
 
+const pokemonCache = {};
 /** Fetch a Pokémon's PokéAPI record, trying the full form slug first,
-    then the species' default variety. */
+    then the species' default variety. Cached across mons and formats. */
 async function fetchPokemon(name, speciesSlug) {
   const full = name.toLowerCase().replace(/[.'’%]/g, "").replace(/\s+/g, "-");
+  if (pokemonCache[full]) return pokemonCache[full];
+  let p;
   try {
     await sleep(300);
-    return await getJson(`https://pokeapi.co/api/v2/pokemon/${FORM_SLUG_OVERRIDES[full] || full}`);
+    p = await getJson(`https://pokeapi.co/api/v2/pokemon/${FORM_SLUG_OVERRIDES[full] || full}`);
   } catch {
     const species = await getJson(`https://pokeapi.co/api/v2/pokemon-species/${speciesSlug}`);
     const v = (species.varieties || []).find(x => x.is_default) || (species.varieties || [])[0];
     if (!v) throw new Error("no varieties");
     await sleep(300);
-    return await getJson(`https://pokeapi.co/api/v2/pokemon/${v.pokemon.name}`);
+    p = await getJson(`https://pokeapi.co/api/v2/pokemon/${v.pokemon.name}`);
   }
+  pokemonCache[full] = p;
+  return p;
 }
 
 /** For every ranked Pokémon: backfill missing types/stats from PokéAPI
@@ -333,12 +337,17 @@ async function pullFormat(fmt, prev, speciesCache) {
       rank: entry.rank,
       name: entry.name,
       usage: entry.usage,
-      types: detail.types || old.types || [],
+      // Types are ALWAYS backfilled from PokéAPI below. The AI pages have no
+      // reliable type field — their matchup sections previously got misread
+      // as the mon's own typing, corrupting stored data. Starting empty also
+      // purges any bad values carried in previous data.json snapshots.
+      types: [],
       stats: detail.stats && Object.keys(detail.stats).length === 6 ? detail.stats : old.stats || null,
       moves: detail.moves.length ? detail.moves : old.moves || [],
       items: detail.items.length ? detail.items : old.items || [],
       abilities: detail.abilities.length ? detail.abilities : old.abilities || [],
       natures: detail.natures.length ? detail.natures : old.natures || [],
+      builds: detail.builds.length ? detail.builds : old.builds || [],
     };
     const wr = detail.winrate != null ? detail.winrate
       : entry.winrate != null ? entry.winrate

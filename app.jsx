@@ -1140,16 +1140,16 @@ const CATEGORIES = [
   { key: "speed", label: "Speed Tier Simulator", hint: "duels, turn order, scarf hunt" },
   { key: "moves", label: "Common Movesets Quiz", hint: "every move over 30% usage" },
   { key: "items", label: "Common Items Quiz", hint: "every item over 10% usage" },
+  { key: "builds", label: "Common Builds Quiz", hint: "pick the real nature + EV spread" },
   { key: "abilities", label: "Preferred Abilities Quiz", hint: "multiple choice" },
   { key: "natures", label: "Preferred Natures Quiz", hint: "flip cards" },
   { key: "offense", label: "Physically or Specially Offensive Quiz", hint: "or mixed?" },
   { key: "defense", label: "Physically or Specially Defensive Quiz", hint: "or balanced?" },
-  { key: "weak", label: "Supereffective Type Matchup Quiz", hint: "what does this type hit hard?" },
-  { key: "resist", label: "Resisted Type Matchup Quiz", hint: "what does this type resist?" },
+  { key: "typematch", label: "Type Matchup Quiz", hint: "supereffective or resisted" },
   { key: "natureChart", label: "Nature Types Quiz", hint: "all 25 natures, +10%/−10%" },
 ];
 const SELECT_CATS = ["moves", "items", "weak", "resist"];
-const MC_CATS = ["abilities", "offense", "defense"];
+const MC_CATS = ["abilities", "offense", "defense", "builds"];
 const FLIP_CATS = ["stats", "natures", "natureChart"];
 
 const NATURE_CHART = [
@@ -1213,6 +1213,18 @@ const isMegaUser = (m) =>
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/* EV spread "2/32/0/0/0/32" -> "2 HP / 32 Atk / 32 Spe" (nonzero only). */
+const EV_ORDER = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"];
+function evsPretty(evs) {
+  const parts = String(evs).split("/").map(s => parseInt(s, 10));
+  const out = [];
+  parts.forEach((v, i) => { if (v > 0 && EV_ORDER[i]) out.push(v + " " + EV_ORDER[i]); });
+  return out.length ? out.join(" / ") : String(evs);
+}
+/* Nature is currently blank in the source data (Pikalytics bug, reported);
+   when it's null the label gracefully shows the spread alone. */
+const buildLabel = (b) => (b.nature ? b.nature + " · " : "") + evsPretty(b.evs);
+
 /* Expand a ranked list with Mega Evolution forms (from mon.megas, enriched
    by the fetch script via PokéAPI). Megas inherit the base form's usage
    context, moves, items, and natures; stats, types, and ability are the
@@ -1227,13 +1239,27 @@ function megaEntry(base, mega) {
     natures: base.natures,
   };
 }
+/* A Mega is either a PokéAPI-expanded entry (isMega flag) or a ranked row
+   whose name contains "Mega" as a word/segment (e.g. "Charizard-Mega-Y",
+   "Mega Mawile") — but not Meganium or Yanmega. */
+const MEGA_NAME = /(^|[\s-])mega([\s-]|$)/i;
+const isMegaEntry = (m) => m.isMega || MEGA_NAME.test(m.name);
+/* Order-insensitive name key: "Mega Charizard Y" == "Charizard-Mega-Y". */
+const nameKey = (n) => n.toLowerCase().replace(/[^a-z0-9\s-]/g, "").split(/[\s-]+/).filter(Boolean).sort().join("");
+
 function expandPool(mons, megaMode) {
-  const out = [];
+  const present = new Set(mons.map(m => nameKey(m.name)));
+  const all = [];
   mons.forEach(m => {
-    if (megaMode !== "only") out.push(m);
-    if (megaMode !== "exclude") (m.megas || []).forEach(g => out.push(megaEntry(m, g)));
+    all.push(m);
+    // Skip PokéAPI-expanded Megas that already exist as their own ranked rows
+    (m.megas || []).forEach(g => {
+      if (!present.has(nameKey(g.name))) all.push(megaEntry(m, g));
+    });
   });
-  return out;
+  if (megaMode === "exclude") return all.filter(m => !isMegaEntry(m));
+  if (megaMode === "only") return all.filter(isMegaEntry);
+  return all;
 }
 
 const hasAbility = (mon, name) =>
@@ -1272,7 +1298,7 @@ function speedContext(mon, pool) {
 
 /* --------------------------- deck building --------------------------- */
 
-function buildDeck({ mons, count, cat, statKey, doShuffle }) {
+function buildDeck({ mons, count, cat, statKey, doShuffle, abilSkipMono }) {
   const pool = mons.slice(0, count);
   const cards = [];
 
@@ -1309,9 +1335,22 @@ function buildDeck({ mons, count, cat, statKey, doShuffle }) {
           target: own.filter(e => e.pct != null && e.pct > 10).map(e => e.name),
         });
       }
+    } else if (cat === "builds") {
+      const own = (mon.builds || [])[0];
+      if (own) {
+        const correct = buildLabel(own);
+        const distractors = shuffle([...new Set(
+          pool.filter(m => m.name !== mon.name)
+            .map(m => (m.builds || [])[0]).filter(Boolean)
+            .map(buildLabel).filter(l => l !== correct)
+        )]).slice(0, 3);
+        if (distractors.length) {
+          cards.push({ mon, cat, options: shuffle([correct, ...distractors]), correct, buildPct: own.pct });
+        }
+      }
     } else if (cat === "abilities") {
       const own = (mon.abilities || []).map(norm);
-      if (own.length) {
+      if (own.length && !(abilSkipMono && own.length < 2)) {
         let options = own.map(e => e.name);
         if (options.length < 3) {
           const others = shuffle([...new Set(
@@ -1519,6 +1558,8 @@ function ConfigScreen({ formats, generated, live, onStart }) {
 
   const [cat, setCat] = useState("stats");
   const [statKey, setStatKey] = useState("spe");
+  const [typeMatchKey, setTypeMatchKey] = useState("weak");
+  const [abilSkipMono, setAbilSkipMono] = useState(true);
   const [count, setCount] = useState(20);
   const [megaMode, setMegaMode] = useState("include"); // include | exclude | only
   // speed matchups options
@@ -1537,15 +1578,17 @@ function ConfigScreen({ formats, generated, live, onStart }) {
     if (key === "natureChart") return true;
     if (key === "stats" || key === "speed" || key === "offense" || key === "defense")
       return pool.some(m => m.stats);
-    if (key === "weak" || key === "resist") return true;
+    if (key === "typematch") return true;
+    if (key === "builds") return pool.some(m => m.builds && m.builds.length);
     if (key === "moves") return pool.some(m => (m.moves || []).map(norm).some(e => e.pct != null));
     if (key === "items") return pool.some(m => (m.items || []).map(norm).some(e => e.pct != null));
     return pool.some(m => m[key] && m[key].length);
   };
 
   const duelPool = pool.filter(m => m.stats);
+  const effCat = cat === "typematch" ? typeMatchKey : cat;
   const deckPreview = cat !== "speed" && catAvailable(cat)
-    ? buildDeck({ mons: availableMons, count: effCount, cat, statKey, doShuffle: false })
+    ? buildDeck({ mons: availableMons, count: effCount, cat: effCat, statKey, doShuffle: false, abilSkipMono })
     : [];
   const canStart = cat === "speed"
     ? duelPool.length >= (duelVariant === "faster" ? 2 : 4)
@@ -1687,7 +1730,7 @@ function ConfigScreen({ formats, generated, live, onStart }) {
                   <span style={{ fontWeight: 600, fontSize: 15 }}>{c.label}</span>
                   <span style={{ color: "var(--muted)", fontSize: 12, marginLeft: "auto", textAlign: "right" }}>
                     {unavailable
-                      ? (c.key === "moves" || c.key === "items"
+                      ? (["moves", "items", "builds"].includes(c.key)
                         ? "needs usage % — arrives with the first data pull"
                         : "no data in this snapshot yet")
                       : c.hint}
@@ -1703,6 +1746,36 @@ function ConfigScreen({ formats, generated, live, onStart }) {
                       </SubPill>
                     ))}
                   </div>
+                )}
+
+                {c.key === "typematch" && on && (
+                  <div style={{ margin: "8px 0 4px 30px", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                    <SubPill small active={typeMatchKey === "weak"} onClick={() => setTypeMatchKey("weak")}>
+                      Supereffective
+                    </SubPill>
+                    <SubPill small active={typeMatchKey === "resist"} onClick={() => setTypeMatchKey("resist")}>
+                      Resisted
+                    </SubPill>
+                    <span style={{ color: "var(--muted)", fontSize: 12 }}>
+                      {typeMatchKey === "weak" ? "what the type hits hard" : "what the type resists"}
+                    </span>
+                  </div>
+                )}
+
+                {c.key === "abilities" && on && (
+                  <label
+                    style={{ margin: "8px 0 4px 30px", display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 13, cursor: "pointer" }}
+                    onClick={() => setAbilSkipMono(v => !v)}
+                  >
+                    <span style={{
+                      width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                      border: `2px solid ${abilSkipMono ? "var(--gold)" : "rgba(255,255,255,.35)"}`,
+                      background: abilSkipMono ? "var(--gold)" : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "#1B1D36", fontSize: 10, fontWeight: 900,
+                    }}>{abilSkipMono ? "✓" : ""}</span>
+                    Skip Pokémon with only one tracked ability
+                  </label>
                 )}
 
                 {c.key === "speed" && on && (
@@ -1795,7 +1868,7 @@ function ConfigScreen({ formats, generated, live, onStart }) {
         disabled={!canStart}
         onClick={() => onStart(cat === "speed"
           ? { type: "duel", reg, pool: duelPool, duelCfg: { target: duelTarget, variant: duelVariant, hard: duelHard, natures: duelHard && duelNatures } }
-          : { type: "flash", reg, pool, deckCfg: { mons: availableMons, count: effCount, cat, statKey, doShuffle: true } }
+          : { type: "flash", reg, pool, deckCfg: { mons: availableMons, count: effCount, cat: effCat, statKey, doShuffle: true, abilSkipMono } }
         )}
         style={{
           width: "100%", marginTop: 6, padding: "16px", borderRadius: 12, border: "none",
@@ -1977,6 +2050,36 @@ function TypeGridSelect({ multOf, target, picks, onToggle, submitted }) {
   );
 }
 
+const abilityBlurbCache = {};
+function AbilityBlurb({ name }) {
+  const key = name.toLowerCase();
+  const [text, setText] = useState(abilityBlurbCache[key]);
+  useEffect(() => {
+    let alive = true;
+    if (abilityBlurbCache[key] !== undefined) { setText(abilityBlurbCache[key]); return; }
+    const slug = key.replace(/[.'’()]/g, "").trim().replace(/\s+/g, "-");
+    fetch(`https://pokeapi.co/api/v2/ability/${slug}`)
+      .then(r => (r.ok ? r.json() : Promise.reject()))
+      .then(j => {
+        const en = (j.effect_entries || []).find(e => e.language && e.language.name === "en");
+        const blurb = en ? (en.short_effect || en.effect || "") : "";
+        abilityBlurbCache[key] = blurb || null;
+        if (alive) setText(blurb || null);
+      })
+      .catch(() => { abilityBlurbCache[key] = null; if (alive) setText(null); });
+    return () => { alive = false; };
+  }, [key]);
+  if (!text) return null;
+  return (
+    <div style={{
+      marginTop: 6, fontSize: 13.5, color: "#4A4D6B",
+      borderLeft: "3px solid #FFCB05", paddingLeft: 12, lineHeight: 1.6,
+    }}>
+      <b>{name}:</b> {text}
+    </div>
+  );
+}
+
 function MCOptions({ card, picked, onPick, submitted }) {
   const { options, correct, mon, cat } = card;
   const ownPct = cat === "abilities"
@@ -2012,7 +2115,12 @@ function MCOptions({ card, picked, onPick, submitted }) {
                   : Object.prototype.hasOwnProperty.call(ownPct, opt) ? "runs it" : "not this mon"}
               </span>
             )}
-            {submitted && isC && cat !== "abilities" && (
+            {submitted && cat === "builds" && isC && card.buildPct != null && (
+              <span style={{ marginLeft: "auto", fontFamily: "var(--mono)", fontSize: 12, color: "#1E7A4D" }}>
+                {card.buildPct}% of builds
+              </span>
+            )}
+            {submitted && isC && cat !== "abilities" && cat !== "builds" && (
               <span style={{ marginLeft: "auto", fontSize: 13 }}>✓</span>
             )}
           </button>
@@ -2028,6 +2136,7 @@ function MCOptions({ card, picked, onPick, submitted }) {
             : <span><b>Def {mon.stats.def}</b> vs <b>SpD {mon.stats.spd}</b> (within {MIXED_GAP} = balanced)</span>}
         </div>
       )}
+      {submitted && cat === "abilities" && <AbilityBlurb name={correct} />}
       {!submitted && (
         <div style={{ fontSize: 11.5, color: "#9DA0B8" }}>Tap your answer.</div>
       )}
@@ -2043,11 +2152,12 @@ const CAT_PROMPT = {
   moves: "Select every move over 30% usage",
   items: "Select every item over 10% usage",
   abilities: "Most common ability?",
+  builds: "Which is its most common build?",
   offense: "Physical, special, or mixed attacker?",
   defense: "Physically or specially bulkier?",
 };
 const CAT_SHORT = {
-  natureChart: "nature", weak: "super effective", resist: "resists",
+  natureChart: "nature", weak: "super effective", resist: "resists", builds: "build",
   offense: "offense", defense: "defense", abilities: "ability",
 };
 
