@@ -29,3 +29,4 @@ jobs:
           git add data.json
           git diff --cached --quiet || git commit -m "data: nightly Pikalytics refresh"
           git push
+
