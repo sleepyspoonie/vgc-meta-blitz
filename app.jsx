@@ -1,5 +1,5 @@
 /* global React, ReactDOM */
-const { useEffect, useMemo, useState } = React;
+const { useEffect, useMemo, useRef, useState } = React;
 
 /* ============================================================
    META DRILL — Pokémon Champions meta study tool
@@ -1137,7 +1137,7 @@ const STAT_COLOR = { atk: "#E5484D", def: "#E8913A", spa: "#6390F0", spd: "#7AC7
 
 const CATEGORIES = [
   { key: "stats", label: "Base Stat Quiz", hint: "drill one stat" },
-  { key: "speed", label: "Speed Tier Simulator", hint: "1v1 duel or 2v2 turn order" },
+  { key: "speed", label: "Speed Tier Simulator", hint: "duels, turn order, scarf hunt" },
   { key: "moves", label: "Common Movesets Quiz", hint: "every move over 30% usage" },
   { key: "items", label: "Common Items Quiz", hint: "every item over 10% usage" },
   { key: "abilities", label: "Preferred Abilities Quiz", hint: "multiple choice" },
@@ -1548,11 +1548,12 @@ function ConfigScreen({ formats, generated, live, onStart }) {
     ? buildDeck({ mons: availableMons, count: effCount, cat, statKey, doShuffle: false })
     : [];
   const canStart = cat === "speed"
-    ? duelPool.length >= (duelVariant === "order" ? 4 : 2)
+    ? duelPool.length >= (duelVariant === "faster" ? 2 : 4)
     : deckPreview.length > 0;
 
   const startLabel = cat === "speed"
-    ? (duelVariant === "order" ? (duelHard ? "Start hard mode" : "Start turn order") : "Start speed duel")
+    ? (duelVariant === "order" ? (duelHard ? "Start hard mode" : "Start turn order")
+      : duelVariant === "scarf" ? "Start scarf hunt" : "Start speed duel")
     : "Start drilling";
 
   return (
@@ -1715,6 +1716,7 @@ function ConfigScreen({ formats, generated, live, onStart }) {
                       {[
                         { id: "faster", title: "1v1 Duel", sub: "pick the faster mon" },
                         { id: "order", title: "2v2 Turn Order", sub: "order all four" },
+                        { id: "scarf", title: "Find the Scarf", sub: "who's holding it?" },
                       ].map(v => {
                         const von = duelVariant === v.id;
                         return (
@@ -1730,7 +1732,7 @@ function ConfigScreen({ formats, generated, live, onStart }) {
                         );
                       })}
                     </div>
-                    {duelVariant === "order" && (
+                    {duelVariant !== "faster" && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <label style={{ display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 13.5, cursor: "pointer" }}
                           onClick={() => setDuelHard(v => !v)}>
@@ -1741,9 +1743,9 @@ function ConfigScreen({ formats, generated, live, onStart }) {
                             display: "flex", alignItems: "center", justifyContent: "center",
                             color: "#fff", fontSize: 10, fontWeight: 900,
                           }}>{duelHard ? "✓" : ""}</span>
-                          🔥 Hard mode
+                          🔥 {duelVariant === "scarf" ? "More effects" : "Hard mode"}
                           <span style={{ color: "var(--muted)", fontSize: 11, marginLeft: "auto" }}>
-                            Scarf · Tailwind · PAR · weather · TR
+                            {duelVariant === "scarf" ? "Tailwind · PAR · weather · TR" : "Scarf · Tailwind · PAR · weather · TR"}
                           </span>
                         </label>
                         {duelHard && (
@@ -2944,6 +2946,354 @@ function TurnOrderScreen({ pool, target, hard, natures, onDone, onQuit }) {
   );
 }
 
+/* ------------------------- find the scarf ------------------------- */
+
+/* One of the four secretly holds a Choice Scarf. The observed move order
+   is shown; the player must deduce the holder. Rounds are regenerated
+   until the puzzle has a unique answer: no other Pokémon could hold the
+   Scarf and produce the same observed order. */
+function buildScarfRound(pool, prevKey, hard, useNatures) {
+  let best = null;
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const mons = shuffle(pool).slice(0, 4);
+    const key = mons.map(m => m.name).sort().join("|");
+    if (key === prevKey && attempt < 30) continue;
+
+    const mods = { weather: null, weatherSetBy: null, trickRoom: false, tailwindSide: null, scarf: [], para: [], natures: {} };
+    if (hard) {
+      const setters = [];
+      mons.forEach(m => {
+        Object.entries(WEATHER_SETTERS).forEach(([ab, w]) => {
+          if (hasAbility(m, ab)) setters.push({ name: m.name, ability: ab, weather: w });
+        });
+      });
+      if (setters.length && Math.random() < 0.5) {
+        const s = setters[Math.floor(Math.random() * setters.length)];
+        mods.weather = s.weather;
+        mods.weatherSetBy = s;
+      } else if (!setters.length) {
+        const relevant = Object.keys(WEATHER_META).filter(w => mons.some(m => boostAbility(m, w)));
+        if (relevant.length && Math.random() < 0.4) {
+          mods.weather = relevant[Math.floor(Math.random() * relevant.length)];
+        }
+      }
+      if (Math.random() < 0.3) mods.tailwindSide = Math.random() < 0.5 ? 0 : 1;
+      if (Math.random() < 0.18) mods.trickRoom = true;
+      if (Math.random() < 0.25) mods.para.push(mons[Math.floor(Math.random() * 4)].name);
+      if (useNatures) {
+        mons.forEach(m => {
+          const r = Math.random();
+          if (r < 0.35) {
+            mods.natures[m.name] = NATURE_PLUS_SPE[Math.floor(Math.random() * NATURE_PLUS_SPE.length)];
+          } else if (r < 0.7) {
+            mods.natures[m.name] = NATURE_MINUS_SPE[Math.floor(Math.random() * NATURE_MINUS_SPE.length)];
+          }
+        });
+      }
+    }
+
+    const holder = mons[Math.floor(Math.random() * 4)].name;
+    mods.scarf = [holder];
+    const sideOf = (m) => (mons.indexOf(m) < 2 ? 0 : 1);
+    const effWith = (scarfName) => Object.fromEntries(
+      mons.map(m => [m.name, effSpeed(m, sideOf(m), { ...mods, scarf: [scarfName] }).value])
+    );
+    const trueEff = effWith(holder);
+    const seq = [...mons].sort((a, b) =>
+      mods.trickRoom ? trueEff[a.name] - trueEff[b.name] : trueEff[b.name] - trueEff[a.name]);
+    const consistentWith = (vals) => seq.every((m, i) => i === 0 || (
+      mods.trickRoom
+        ? vals[seq[i - 1].name] <= vals[m.name]
+        : vals[seq[i - 1].name] >= vals[m.name]
+    ));
+    const ambiguous = mons.some(c => c.name !== holder && consistentWith(effWith(c.name)));
+
+    best = { mons, key, mods, holder, seq };
+    if (!ambiguous) return best;
+  }
+  return best;
+}
+
+const ORDINALS = ["1st", "2nd", "3rd", "4th"];
+
+function ScarfHuntScreen({ pool, target, hard, natures, onDone, onQuit }) {
+  const [round, setRound] = useState(() => buildScarfRound(pool, null, hard, natures));
+  const [picked, setPicked] = useState(null);
+  const [wins, setWins] = useState(0);
+  const [attempts, setAttempts] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [drag, setDrag] = useState(null);
+  const [hover, setHover] = useState(null);
+  const cardRefs = useRef({});
+
+  const { mons, mods, holder, seq } = round;
+  const sideOf = (m) => (mons.indexOf(m) < 2 ? 0 : 1);
+  const eff = Object.fromEntries(mons.map(m => [m.name, effSpeed(m, sideOf(m), mods)]));
+
+  const orderLabel = {};
+  seq.forEach((m, i) => {
+    orderLabel[m.name] = (i > 0 && eff[m.name].value === eff[seq[i - 1].name].value)
+      ? orderLabel[seq[i - 1].name]
+      : ORDINALS[i];
+  });
+
+  const answered = picked !== null;
+  const wasRight = answered && picked === holder;
+  const holderMon = mons.find(m => m.name === holder);
+
+  const choose = (name) => {
+    if (answered) return;
+    setPicked(name);
+    setAttempts(n => n + 1);
+    if (name === holder) {
+      setWins(w => w + 1);
+      setStreak(s => { const ns = s + 1; setBestStreak(b => Math.max(b, ns)); return ns; });
+    } else {
+      setStreak(0);
+    }
+  };
+
+  const next = () => {
+    if (wasRight && wins >= target) { onDone({ target, attempts, bestStreak }); return; }
+    setPicked(null);
+    setHover(null);
+    setRound(buildScarfRound(pool, round.key, hard, natures));
+  };
+
+  const hitTest = (x, y) => {
+    let hit = null;
+    Object.entries(cardRefs.current).forEach(([name, el]) => {
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) hit = name;
+    });
+    return hit;
+  };
+  const onTokenDown = (e) => {
+    if (answered) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDrag({ x: e.clientX, y: e.clientY });
+  };
+  const onTokenMove = (e) => {
+    if (!drag) return;
+    setDrag({ x: e.clientX, y: e.clientY });
+    setHover(hitTest(e.clientX, e.clientY));
+  };
+  const onTokenUp = (e) => {
+    if (!drag) return;
+    const hit = hitTest(e.clientX, e.clientY);
+    setDrag(null);
+    setHover(null);
+    if (hit) choose(hit);
+  };
+
+  const recap = seq
+    .map(m => `${m.name} (${eff[m.name].value})`)
+    .join(" → ");
+
+  const fieldCard = (mon) => {
+    const isHolder = mon.name === holder;
+    const chips = [];
+    if (answered && isHolder) chips.push(<ModChip key="s" text="Choice Scarf" bg="#E8913A" />);
+    if (mods.para.includes(mon.name)) chips.push(<ModChip key="p" text="PAR" bg="#F7D02C" fg="#5A4A00" />);
+    const wAb = boostAbility(mon, mods.weather);
+    if (wAb) chips.push(<ModChip key="w" text={wAb} bg={WEATHER_META[mods.weather].color} />);
+    const nat = mods.natures && mods.natures[mon.name];
+    if (nat) {
+      const m = natureSpeedMult(nat);
+      chips.push(<ModChip key="n" text={nat} bg={m > 1 ? "#30A46C" : m < 1 ? "#6F35FC" : "#8A8DA8"} />);
+    }
+    const border = answered
+      ? (isHolder ? "#30A46C" : picked === mon.name ? "#E5484D" : "rgba(255,255,255,.14)")
+      : hover === mon.name ? "var(--gold)" : "rgba(255,255,255,.14)";
+    return (
+      <button
+        key={mon.name}
+        ref={el => { cardRefs.current[mon.name] = el; }}
+        onClick={() => choose(mon.name)}
+        disabled={answered}
+        style={{
+          position: "relative", minWidth: 0, cursor: answered ? "default" : "pointer",
+          background: "#F5F6FA", borderRadius: 14, padding: "12px 6px 10px",
+          border: `2.5px solid ${border}`,
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+          color: "#22243E", boxShadow: "0 6px 18px rgba(0,0,0,.4)",
+          transition: "border-color .1s",
+        }}
+      >
+        <span style={{
+          position: "absolute", top: -10, right: -6, minWidth: 34, height: 24,
+          borderRadius: 999, background: "#22243E", color: "#FFCB05",
+          border: "1.5px solid #FFCB05",
+          fontFamily: "var(--display)", fontWeight: 800, fontSize: 13.5,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "0 8px", boxShadow: "0 2px 6px rgba(0,0,0,.4)",
+        }}>{orderLabel[mon.name]}</span>
+        <MonSprite mon={mon} size={68} />
+        <div style={{
+          fontFamily: "var(--display)", fontWeight: 800, fontSize: 15, lineHeight: 1.05,
+          textTransform: "uppercase", textAlign: "center", overflowWrap: "anywhere",
+        }}>{mon.name}</div>
+        {chips.length > 0 && (
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "center" }}>{chips}</div>
+        )}
+        <div style={{ minHeight: 34, display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <span style={{
+            fontFamily: "var(--display)", fontWeight: 800, fontSize: 22, lineHeight: 1,
+            color: answered ? "#22243E" : "transparent",
+          }}>{answered ? eff[mon.name].value : "?"}</span>
+          {answered && eff[mon.name].breakdown && (
+            <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "#8A8DA8", marginTop: 2 }}>
+              {eff[mon.name].breakdown}
+            </span>
+          )}
+        </div>
+      </button>
+    );
+  };
+
+  const sideLabel = (text, side) => (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 8, marginBottom: 6,
+      fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: ".16em",
+      textTransform: "uppercase", color: "rgba(255,255,255,.4)",
+    }}>
+      {text}
+      {mods.tailwindSide === side && (
+        <span style={{
+          color: "#7AC74C", border: "1px solid #7AC74C", borderRadius: 999,
+          padding: "1px 8px", letterSpacing: ".08em",
+        }}>🍃 Tailwind</span>
+      )}
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth: 560, margin: "0 auto", padding: "18px 18px 40px" }}>
+      {drag && (
+        <div style={{
+          position: "fixed", left: drag.x, top: drag.y, zIndex: 60,
+          transform: "translate(-50%, -65%)", fontSize: 42, pointerEvents: "none",
+          filter: "drop-shadow(0 4px 8px rgba(0,0,0,.5))",
+        }}>🧣</div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+        <button onClick={onQuit} style={{
+          background: "transparent", border: "none", color: "var(--muted)",
+          fontSize: 13, cursor: "pointer", padding: 4,
+        }}>← End</button>
+        <div style={{ flex: 1, height: 6, background: "rgba(255,255,255,.1)", borderRadius: 999 }}>
+          <div style={{
+            width: `${(wins / target) * 100}%`, height: "100%",
+            background: "var(--gold)", borderRadius: 999, transition: "width .25s",
+          }} />
+        </div>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--muted)" }}>
+          {wins}/{target} wins
+        </span>
+      </div>
+      <div style={{
+        display: "flex", justifyContent: "flex-end", marginBottom: 10,
+        fontFamily: "var(--mono)", fontSize: 12, color: streak >= 3 ? "var(--gold)" : "var(--muted)",
+      }}>
+        {streak > 0 ? `🔥 ${streak} streak` : " "}
+      </div>
+
+      <div style={{
+        textAlign: "center", fontFamily: "var(--mono)", fontSize: 12,
+        letterSpacing: ".14em", textTransform: "uppercase", color: "var(--muted)",
+        marginBottom: 10,
+      }}>One of these is holding a Choice Scarf — the move order gives it away</div>
+
+      {(mods.weather || mods.trickRoom) && (
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 12 }}>
+          {mods.weather && (
+            <span style={{
+              background: WEATHER_META[mods.weather].color, color: "#fff", borderRadius: 999,
+              padding: "5px 14px", fontSize: 13, fontWeight: 800, letterSpacing: ".04em",
+              textShadow: "0 1px 2px rgba(0,0,0,.3)",
+            }}>
+              {WEATHER_META[mods.weather].icon} {WEATHER_META[mods.weather].label}
+              {mods.weatherSetBy && (
+                <span style={{ fontWeight: 600, fontSize: 11.5, opacity: .92 }}>
+                  {" "}· {mods.weatherSetBy.name}'s {mods.weatherSetBy.ability}
+                </span>
+              )}
+            </span>
+          )}
+          {mods.trickRoom && (
+            <span style={{
+              background: "#735797", color: "#fff", borderRadius: 999,
+              padding: "5px 14px", fontSize: 13, fontWeight: 800, letterSpacing: ".08em",
+              textTransform: "uppercase", textShadow: "0 1px 2px rgba(0,0,0,.3)",
+              boxShadow: "0 0 14px rgba(115,87,151,.7)",
+            }}>🔮 Trick Room</span>
+          )}
+        </div>
+      )}
+
+      {sideLabel("Their side", 0)}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+        {mons.slice(0, 2).map(fieldCard)}
+      </div>
+      {sideLabel("Your side", 1)}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {mons.slice(2, 4).map(fieldCard)}
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        {!answered ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+            <button
+              onPointerDown={onTokenDown}
+              onPointerMove={onTokenMove}
+              onPointerUp={onTokenUp}
+              style={{
+                touchAction: "none", userSelect: "none", WebkitUserSelect: "none",
+                background: drag ? "rgba(255,203,5,.25)" : "var(--gold)",
+                color: "#1B1D36", border: "none", borderRadius: 999,
+                padding: "12px 22px", cursor: "grab",
+                fontFamily: "var(--display)", fontWeight: 800, fontSize: 18,
+                letterSpacing: ".04em", textTransform: "uppercase",
+                boxShadow: "0 4px 18px rgba(255,203,5,.35)",
+                opacity: drag ? 0.55 : 1,
+              }}
+            >🧣 Choice Scarf</button>
+            <span style={{ color: "var(--muted)", fontSize: 12.5 }}>
+              Drag it onto the holder — or just tap a Pokémon
+            </span>
+          </div>
+        ) : (
+          <>
+            <div style={{
+              borderRadius: 12, padding: "12px 14px", marginBottom: 10,
+              background: wasRight ? "rgba(48,164,108,.15)" : "rgba(229,72,77,.15)",
+              border: `1.5px solid ${wasRight ? "#30A46C" : "#E5484D"}`,
+              color: "#fff", fontSize: 14, lineHeight: 1.6, textAlign: "center",
+            }}>
+              <b>{wasRight ? "Correct!" : "Not quite."}</b>{" "}
+              {holderMon.name} was holding the Scarf — base {holderMon.stats.spe} Spe.
+              <br />
+              <span style={{ fontSize: 13.5 }}>{mods.trickRoom ? "Trick Room order: " : ""}{recap}</span>
+            </div>
+            <button onClick={next} style={{
+              width: "100%", padding: "14px", borderRadius: 12, border: "none",
+              background: "var(--gold)", color: "#1B1D36", cursor: "pointer",
+              fontFamily: "var(--display)", fontWeight: 800, fontSize: 20,
+              textTransform: "uppercase", letterSpacing: ".05em",
+              boxShadow: "0 4px 18px rgba(255,203,5,.35)",
+            }}>
+              {wasRight && wins >= target ? "Finish 🏆" : "Next field →"}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DuelSummary({ result, onRestart, onAgain }) {
   const { target, attempts, bestStreak } = result;
   const acc = Math.round((target / attempts) * 100);
@@ -3139,6 +3489,16 @@ function App() {
       {screen === "duel" && session && (
         session.duelCfg.variant === "order" ? (
           <TurnOrderScreen
+            key={sessionId}
+            pool={session.pool}
+            target={session.duelCfg.target}
+            hard={session.duelCfg.hard}
+            natures={session.duelCfg.natures}
+            onQuit={() => setScreen("config")}
+            onDone={(res) => { setResult(res); setScreen("duelDone"); }}
+          />
+        ) : session.duelCfg.variant === "scarf" ? (
+          <ScarfHuntScreen
             key={sessionId}
             pool={session.pool}
             target={session.duelCfg.target}

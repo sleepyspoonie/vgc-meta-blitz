@@ -45,7 +45,7 @@ Mega Stones in the item data).
 | Drill | How it plays |
 |-------|--------------|
 | Base Stat Quiz | Flip cards for one stat (default Speed, with speed-tier context on reveal) |
-| Speed Tier Simulator | 1v1 duels or 2v2 turn order with win targets, streaks, and an optional Hard Mode (Scarf ×1.5, Tailwind ×2, PAR ×0.5, weather + Swift Swim/Chlorophyll/Sand Rush/Slush Rush ×2, Trick Room reversal, optional ±Spe natures). Weather setters put their weather up 50% of the time. |
+| Speed Tier Simulator | 1v1 duels, 2v2 turn order, or Find the Scarf (the move order is shown — drag the Scarf onto the hidden holder; rounds regenerate until the answer is unique). Win targets, streaks, and an optional Hard Mode (Scarf ×1.5, Tailwind ×2, PAR ×0.5, weather + Swift Swim/Chlorophyll/Sand Rush/Slush Rush ×2, Trick Room reversal, optional ±Spe natures). Weather setters put their weather up 50% of the time. |
 | Common Movesets Quiz | The mon's tracked moves, shuffled — select every move over 30% usage |
 | Common Items Quiz | 8 items (the mon's own + distractors from other mons) — select everything over 10% usage |
 | Preferred Abilities Quiz | Multiple choice — pick the mon's most common ability |
