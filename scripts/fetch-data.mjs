@@ -11,6 +11,13 @@
  * The "current" format slug rotates with seasons (e.g. battledataregmbs3),
  * so it is auto-detected from /ai/pokedex on every run.
  *
+ * Move data: the damage-bucket game needs each move's base power, damage
+ * class (physical/special/status), and type — none of which the Pikalytics
+ * pages provide. After each pull, every distinct move seen across the pool
+ * is looked up once on PokéAPI and written to a top-level `moveData` map on
+ * the format. Cached across formats within a run; carried forward if a
+ * lookup fails.
+ *
  * Mega Evolutions: Pikalytics tracks base forms only, so after each pull
  * the script checks EVERY ranked Pokémon against PokéAPI for Mega form
  * varieties and attaches their stats, types, and ability as mon.megas.
@@ -236,6 +243,42 @@ async function fetchPokemon(name, speciesSlug) {
   return p;
 }
 
+const moveDataCache = {};
+const moveSlug = (name) => name.toLowerCase()
+  .replace(/[.'’]/g, "").replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+
+/** Look up base power / damage class / type for every distinct move used by
+    the pool. Returns a { [moveName]: {power, class, type} } map. */
+async function fetchMoveData(mons, prevMoveData) {
+  const names = [...new Set(
+    mons.flatMap(m => (m.moves || []).map(e => (typeof e === "string" ? e : e.name)))
+  )];
+  const out = {};
+  for (const name of names) {
+    if (moveDataCache[name]) { out[name] = moveDataCache[name]; continue; }
+    const slug = moveSlug(name);
+    try {
+      await sleep(300);
+      const j = await getJson(`https://pokeapi.co/api/v2/move/${slug}`);
+      const rec = {
+        power: j.power,                              // null for status/variable moves
+        class: j.damage_class ? j.damage_class.name : null, // physical | special | status
+        type: j.type ? j.type.name : null,
+      };
+      out[name] = rec;
+      moveDataCache[name] = rec;
+      console.log(`  · ${name}: ${rec.power ?? "—"} BP ${rec.class || "?"} ${rec.type || "?"}`);
+    } catch (err) {
+      if (prevMoveData && prevMoveData[name]) {
+        out[name] = prevMoveData[name];
+      } else {
+        console.warn(`  ! move lookup failed for ${name}: ${err.message}`);
+      }
+    }
+  }
+  return out;
+}
+
 /** For every ranked Pokémon: backfill missing types/stats from PokéAPI
     (the AI detail pages don't include a type section), and attach Mega
     form varieties. speciesCache persists across formats within a run. */
@@ -359,7 +402,10 @@ async function pullFormat(fmt, prev, speciesCache) {
   }
   console.log("Checking all ranked Pokémon for Mega forms on PokéAPI…");
   await attachMegas(mons, speciesCache);
-  return { ...fmt, slug, mons };
+  console.log("Looking up move base power / damage class on PokéAPI…");
+  const prevMoveData = (prev.byId[fmt.id] || {}).moveData || {};
+  const moveData = await fetchMoveData(mons, prevMoveData);
+  return { ...fmt, slug, mons, moveData };
 }
 
 async function main() {

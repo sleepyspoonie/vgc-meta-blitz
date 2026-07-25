@@ -1074,11 +1074,198 @@ const FALLBACK = {
       "Snow Cloak"
      ]
     }
-   ]
+   ],
+   "moveData": {
+    "Air Slash": {
+     "power": 75,
+     "class": "special",
+     "type": "flying"
+    },
+    "Aqua Jet": {
+     "power": 40,
+     "class": "physical",
+     "type": "water"
+    },
+    "Blizzard": {
+     "power": 110,
+     "class": "special",
+     "type": "ice"
+    },
+    "Brave Bird": {
+     "power": 120,
+     "class": "physical",
+     "type": "flying"
+    },
+    "Bullet Punch": {
+     "power": 40,
+     "class": "physical",
+     "type": "steel"
+    },
+    "Close Combat": {
+     "power": 120,
+     "class": "physical",
+     "type": "fighting"
+    },
+    "Dazzling Gleam": {
+     "power": 80,
+     "class": "special",
+     "type": "fairy"
+    },
+    "Dragon Claw": {
+     "power": 80,
+     "class": "physical",
+     "type": "dragon"
+    },
+    "Dragon Pulse": {
+     "power": 85,
+     "class": "special",
+     "type": "dragon"
+    },
+    "Drain Punch": {
+     "power": 75,
+     "class": "physical",
+     "type": "fighting"
+    },
+    "Draining Kiss": {
+     "power": 50,
+     "class": "special",
+     "type": "fairy"
+    },
+    "Earthquake": {
+     "power": 100,
+     "class": "physical",
+     "type": "ground"
+    },
+    "Flare Blitz": {
+     "power": 120,
+     "class": "physical",
+     "type": "fire"
+    },
+    "Freeze-Dry": {
+     "power": 70,
+     "class": "special",
+     "type": "ice"
+    },
+    "Heat Wave": {
+     "power": 95,
+     "class": "special",
+     "type": "fire"
+    },
+    "Hurricane": {
+     "power": 110,
+     "class": "special",
+     "type": "flying"
+    },
+    "Iron Head": {
+     "power": 80,
+     "class": "physical",
+     "type": "steel"
+    },
+    "Kowtow Cleave": {
+     "power": 85,
+     "class": "physical",
+     "type": "dark"
+    },
+    "Liquidation": {
+     "power": 85,
+     "class": "physical",
+     "type": "water"
+    },
+    "Make It Rain": {
+     "power": 120,
+     "class": "special",
+     "type": "steel"
+    },
+    "Moonblast": {
+     "power": 95,
+     "class": "special",
+     "type": "fairy"
+    },
+    "Play Rough": {
+     "power": 90,
+     "class": "physical",
+     "type": "fairy"
+    },
+    "Poison Jab": {
+     "power": 80,
+     "class": "physical",
+     "type": "poison"
+    },
+    "Protect": {
+     "power": null,
+     "class": "status",
+     "type": "normal"
+    },
+    "Psychic": {
+     "power": 90,
+     "class": "special",
+     "type": "psychic"
+    },
+    "Rock Slide": {
+     "power": 75,
+     "class": "physical",
+     "type": "rock"
+    },
+    "Shadow Ball": {
+     "power": 80,
+     "class": "special",
+     "type": "ghost"
+    },
+    "Solar Beam": {
+     "power": 120,
+     "class": "special",
+     "type": "grass"
+    },
+    "Spirit Break": {
+     "power": 75,
+     "class": "physical",
+     "type": "fairy"
+    },
+    "Stomping Tantrum": {
+     "power": 75,
+     "class": "physical",
+     "type": "ground"
+    },
+    "Sucker Punch": {
+     "power": 70,
+     "class": "physical",
+     "type": "dark"
+    },
+    "Swords Dance": {
+     "power": null,
+     "class": "status",
+     "type": "normal"
+    },
+    "Throat Chop": {
+     "power": 80,
+     "class": "physical",
+     "type": "dark"
+    },
+    "Thunderbolt": {
+     "power": 90,
+     "class": "special",
+     "type": "electric"
+    },
+    "Volt Switch": {
+     "power": 70,
+     "class": "special",
+     "type": "electric"
+    },
+    "Wave Crash": {
+     "power": 120,
+     "class": "physical",
+     "type": "water"
+    },
+    "Weather Ball": {
+     "power": 50,
+     "class": "special",
+     "type": "normal"
+    }
+   }
   }
  ]
 };
-const APP_VERSION = "v8 · 2026-07-25";
+const APP_VERSION = "v13 · 2026-07-25";
 
 const SRS = {
   GRADUATE_STEPS: 2,
@@ -1130,6 +1317,282 @@ function defenseMult(atkType, defTypes) {
 const multLabel = (m) =>
   m === 0 ? "×0" : m === 0.25 ? "×¼" : m === 0.5 ? "×½" : m === 2 ? "×2" : m === 4 ? "×4" : "—";
 
+/* ---- Pokepaste (Pokémon Showdown export) import ----
+   Parses the standard export syntax, e.g.
+
+     Chompy (Garchomp) (M) @ Life Orb
+     Ability: Rough Skin
+     Level: 50
+     Tera Type: Steel
+     EVs: 252 Atk / 4 SpD / 252 Spe
+     Adamant Nature
+     - Dragon Claw
+     - Earthquake
+
+   EVs arrive on either scale: classic 0–252 (Showdown) or Champions 0–32.
+   252 classic EVs and 32 Champions EVs both equal +32 stat points at L50,
+   so classic values are converted with round(ev / 8). */
+const EV_STAT_MAP = {
+  hp: "hp", atk: "atk", attack: "atk", def: "def", defense: "def",
+  spa: "spa", spatk: "spa", "sp. atk": "spa", spd: "spd", spdef: "spd",
+  "sp. def": "spd", spe: "spe", speed: "spe",
+};
+let _natureNameSet = null;
+const natureNameSet = () => (_natureNameSet || (_natureNameSet = new Set(NATURE_CHART.map(n => n.name))));
+
+function parseShowdownTeam(text) {
+  const blocks = String(text || "")
+    .replace(/\r/g, "")
+    .split(/\n\s*\n/)
+    .map(b => b.trim())
+    .filter(Boolean);
+
+  const team = [];
+  for (const block of blocks) {
+    const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
+    if (!lines.length) continue;
+
+    // --- header line: [Nickname (]Species[)] [(M|F)] [@ Item]
+    let header = lines[0];
+    if (/^(ability|level|evs|ivs|tera|shiny|happiness|-)/i.test(header)) continue;
+    let item = null;
+    const at = header.lastIndexOf(" @ ");
+    if (at !== -1) { item = header.slice(at + 3).trim(); header = header.slice(0, at).trim(); }
+    header = header.replace(/\s*\((M|F)\)\s*$/i, "").trim();
+
+    let species = header, nickname = null;
+    const paren = header.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+    if (paren) { nickname = paren[1].trim(); species = paren[2].trim(); }
+    if (!species) continue;
+
+    const mon = {
+      species, nickname, item,
+      ability: null, nature: null, level: 50, tera: null,
+      evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+      moves: [],
+    };
+
+    for (const line of lines.slice(1)) {
+      let m;
+      if ((m = line.match(/^Ability:\s*(.+)$/i))) mon.ability = m[1].trim();
+      else if ((m = line.match(/^Level:\s*(\d+)/i))) mon.level = +m[1];
+      else if ((m = line.match(/^Tera Type:\s*(.+)$/i))) mon.tera = m[1].trim().toLowerCase();
+      else if ((m = line.match(/^EVs:\s*(.+)$/i))) {
+        m[1].split("/").forEach(part => {
+          const p = part.trim().match(/^(\d+)\s+(.+)$/);
+          if (!p) return;
+          const key = EV_STAT_MAP[p[2].trim().toLowerCase()];
+          if (key) mon.evs[key] = +p[1];
+        });
+      } else if ((m = line.match(/^-\s*(.+)$/))) {
+        const mv = m[1].trim().replace(/\s*\[.*\]$/, "");
+        if (mv && mon.moves.length < 4) mon.moves.push(mv);
+      } else if ((m = line.match(/^([A-Za-z]+)\s+Nature$/i))) {
+        const n = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+        if (natureNameSet().has(n)) mon.nature = n;
+      }
+    }
+
+    // scale detection: classic spreads exceed 32 in a slot or 160 total
+    const vals = Object.values(mon.evs);
+    const total = vals.reduce((a, b) => a + b, 0);
+    const classic = vals.some(v => v > 32) || total > 160;
+    if (classic) {
+      Object.keys(mon.evs).forEach(k => {
+        mon.evs[k] = Math.min(32, Math.round(mon.evs[k] / 8));
+      });
+    }
+    mon.evScale = classic ? "classic" : "champions";
+    team.push(mon);
+  }
+  return team;
+}
+
+const evsToString = (e) => [e.hp, e.atk, e.def, e.spa, e.spd, e.spe].join("/");
+
+/* Turn parsed sets into pool-shaped Pokémon by pulling base stats and types
+   from PokéAPI, plus base power for any move our meta data doesn't cover. */
+async function hydrateTeam(parsed, knownMoveData) {
+  const mons = [];
+  const moveData = {};
+  const errors = [];
+
+  for (let i = 0; i < parsed.length; i++) {
+    const set = parsed[i];
+    const slug0 = set.species.toLowerCase().replace(/[.'’:%]/g, "").replace(/\s+/g, "-");
+    const slug = SLUG_OVERRIDES[slug0] || slug0;
+    let api = null;
+    try {
+      const r = await fetch(`https://pokeapi.co/api/v2/pokemon/${slug}`);
+      if (r.ok) api = await r.json();
+    } catch { /* offline */ }
+    if (!api) {
+      try {
+        const r2 = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${slug0.split("-")[0]}`);
+        if (r2.ok) {
+          const j = await r2.json();
+          const v = (j.varieties || []).find(x => x.is_default) || (j.varieties || [])[0];
+          if (v) {
+            const r3 = await fetch(`https://pokeapi.co/api/v2/pokemon/${v.pokemon.name}`);
+            if (r3.ok) api = await r3.json();
+          }
+        }
+      } catch { /* offline */ }
+    }
+    if (!api) { errors.push(set.species); continue; }
+
+    const stats = {};
+    api.stats.forEach(s => {
+      const k = { hp: "hp", attack: "atk", defense: "def", "special-attack": "spa", "special-defense": "spd", speed: "spe" }[s.stat.name];
+      if (k) stats[k] = s.base_stat;
+    });
+
+    mons.push({
+      rank: i + 1,
+      name: set.species,
+      nickname: set.nickname,
+      slug: api.name,
+      isTeam: true,
+      types: api.types.map(x => x.type.name),
+      stats,
+      usage: null,
+      moves: set.moves.map(n => ({ name: n, pct: 100 })),
+      items: set.item ? [{ name: set.item, pct: 100 }] : [],
+      abilities: set.ability ? [{ name: set.ability, pct: 100 }] : [],
+      natures: set.nature ? [{ name: set.nature, pct: 100 }] : [],
+      builds: [{ nature: set.nature || null, evs: evsToString(set.evs), pct: 100 }],
+      teamSet: set,
+    });
+
+    // move base power for anything the meta data doesn't already have
+    for (const mv of set.moves) {
+      if ((knownMoveData && knownMoveData[mv]) || moveData[mv]) continue;
+      const mslug = mv.toLowerCase().replace(/[.'’]/g, "").replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      try {
+        const r = await fetch(`https://pokeapi.co/api/v2/move/${mslug}`);
+        if (r.ok) {
+          const j = await r.json();
+          moveData[mv] = {
+            power: j.power,
+            class: j.damage_class ? j.damage_class.name : null,
+            type: j.type ? j.type.name : null,
+          };
+        }
+      } catch { /* offline */ }
+    }
+  }
+  return { mons, moveData, errors };
+}
+
+/* ---- Damage engine (Gen-9 mechanics, level 50) ----
+   Returns the % of the defender's HP dealt at min and max roll, so the game
+   can accept any bracket the 85–100% roll spread can land in. Hard mode
+   layers item / ability / nature multipliers on top. */
+function l50Stat(base, ev, natureMult) {
+  const s = Math.floor((2 * base + 31 + Math.floor((ev || 0) / 1)) / 2) * 1; // EVs already 0–32 at L50
+  return Math.floor((Math.floor((2 * base + 31) / 2) + 5 + (ev || 0)) * (natureMult || 1));
+}
+function hpStat(base, ev) {
+  return Math.floor((2 * base + 31) / 2) + 50 + 10 + (ev || 0); // L50 HP
+}
+const DAMAGE_CLASS_STAT = { physical: ["atk", "def"], special: ["spa", "spd"] };
+
+/* opts: { atkItem, defItem, atkAbility, defAbility, atkNature, defNature,
+          atkSpeEV..., weather } — all optional (base mode passes none). */
+function calcDamage(attacker, defender, move, opts = {}) {
+  if (!move || move.power == null || move.class === "status") return null;
+  const [atkKey, defKey] = DAMAGE_CLASS_STAT[move.class] || [];
+  if (!atkKey) return null;
+
+  const atkNatMult = opts.atkNatureMult && opts.atkNatureMult[atkKey] || 1;
+  const defNatMult = opts.defNatureMult && opts.defNatureMult[defKey] || 1;
+  const atkEV = opts.atkEV != null ? opts.atkEV : 0;
+  const defEV = opts.defEV != null ? opts.defEV : 0;
+  const hpEV = opts.defHpEV != null ? opts.defHpEV : 0;
+
+  let A = l50Stat(attacker.stats[atkKey], atkEV, atkNatMult);
+  let D = l50Stat(defender.stats[defKey], defEV, defNatMult);
+  const H = hpStat(defender.stats.hp, hpEV);
+
+  // Ability / item stat multipliers (hard mode)
+  if (opts.atkAbility === "Huge Power" || opts.atkAbility === "Pure Power") A *= 2;
+  if (opts.atkItem === "Choice Band" && move.class === "physical") A = Math.floor(A * 1.5);
+  if (opts.atkItem === "Choice Specs" && move.class === "special") A = Math.floor(A * 1.5);
+  if (opts.atkItem === "Assault Vest" ) { /* no atk effect */ }
+  if (opts.defItem === "Assault Vest" && move.class === "special") D = Math.floor(D * 1.5);
+  if (opts.defItem === "Eviolite") D = Math.floor(D * 1.5);
+
+  let power = move.power;
+  // STAB
+  const atkTypes = (attacker.types || []);
+  let stab = atkTypes.includes(move.type) ? 1.5 : 1;
+  if (opts.atkAbility === "Adaptability" && stab > 1) stab = 2;
+
+  // Type effectiveness vs defender
+  const defTypes = (defender.types || []).filter(x => TYPE_CHART[x]);
+  let eff = 1;
+  if (TYPE_CHART[move.type]) {
+    defTypes.forEach(dt => {
+      const m = TYPE_CHART[move.type][dt];
+      eff *= (m === undefined ? 1 : m);
+    });
+  }
+  if (eff === 0) return { min: 0, max: 0, eff, stab, immune: true };
+
+  // Weather (hard mode)
+  let weatherMult = 1;
+  if (opts.weather === "sun") { if (move.type === "fire") weatherMult = 1.5; if (move.type === "water") weatherMult = 0.5; }
+  if (opts.weather === "rain") { if (move.type === "water") weatherMult = 1.5; if (move.type === "fire") weatherMult = 0.5; }
+
+  // Item power mults (hard mode)
+  let itemMult = 1;
+  if (opts.atkItem === "Life Orb") itemMult *= 1.3;
+  if (opts.atkItem === "Muscle Band" && move.class === "physical") itemMult *= 1.1;
+  if (opts.atkItem === "Wise Glasses" && move.class === "special") itemMult *= 1.1;
+
+  // Base damage (L50)
+  const base = Math.floor(Math.floor((Math.floor((2 * 50) / 5 + 2) * power * A) / D) / 50) + 2;
+  const afterMods = (roll) => {
+    let dmg = base;
+    dmg = Math.floor(dmg * weatherMult);
+    dmg = Math.floor(dmg * stab);
+    dmg = Math.floor(dmg * eff);
+    dmg = Math.floor(dmg * roll / 100);
+    dmg = Math.floor(dmg * itemMult);
+    return Math.max(1, dmg);
+  };
+  const minDmg = afterMods(85);
+  const maxDmg = afterMods(100);
+  return {
+    min: (minDmg / H) * 100,
+    max: (maxDmg / H) * 100,
+    eff, stab, H,
+    minDmg, maxDmg,
+  };
+}
+
+/* Damage brackets: four even quarters + OHKO. A result "covers" a bracket if
+   the min–max roll span overlaps it. OHKO wins only if the MIN roll already
+   kills (guaranteed KO), matching how players think about it. */
+const DMG_BUCKETS = [
+  { key: "q1", label: "< 25%", lo: 0, hi: 25 },
+  { key: "q2", label: "25–50%", lo: 25, hi: 50 },
+  { key: "q3", label: "50–75%", lo: 50, hi: 75 },
+  { key: "q4", label: "75–99%", lo: 75, hi: 100 },
+  { key: "ohko", label: "OHKO", lo: 100, hi: Infinity },
+];
+function bucketsForResult(res) {
+  if (!res) return [];
+  const covered = new Set();
+  if (res.max >= 100) covered.add("ohko");
+  DMG_BUCKETS.slice(0, 4).forEach(b => {
+    // overlap between [min,max] capped at <100 and the bracket [lo,hi)
+    const lo = Math.max(res.min, b.lo), hi = Math.min(res.max, b.hi);
+    if (lo < hi && res.min < 100) covered.add(b.key);
+  });
+  return [...covered];
+}
+
 const STAT_META = [
   { key: "hp", label: "HP" }, { key: "atk", label: "Atk" }, { key: "def", label: "Def" },
   { key: "spa", label: "SpA" }, { key: "spd", label: "SpD" }, { key: "spe", label: "Spe" },
@@ -1140,6 +1603,7 @@ const STAT_COLOR = { atk: "#E5484D", def: "#E8913A", spa: "#6390F0", spd: "#7AC7
 const CATEGORIES = [
   { key: "stats", label: "Base Stat Quiz", hint: "drill one stat" },
   { key: "speed", label: "Speed Tier Simulator", hint: "duels, turn order, scarf hunt" },
+  { key: "damage", label: "Damage Buckets", hint: "how hard does this hit?" },
   { key: "moves", label: "Common Movesets Quiz", hint: "every move over 30% usage" },
   { key: "items", label: "Common Items Quiz", hint: "every item over 10% usage" },
   { key: "builds", label: "Common Builds Quiz", hint: "pick the real nature + EV spread" },
@@ -1147,11 +1611,19 @@ const CATEGORIES = [
   { key: "natures", label: "Preferred Natures Quiz", hint: "flip cards" },
   { key: "profile", label: "Physically or Specially Statted Quiz", hint: "offensive or defensive" },
   { key: "typematch", label: "Type Matchup Quiz", hint: "supereffective or resisted" },
-  { key: "natureChart", label: "Nature Types Quiz", hint: "all 25 natures, +10%/−10%" },
+  { key: "natureQuiz", label: "Nature Chart Quiz", hint: "five ways to drill natures" },
 ];
-const SELECT_CATS = ["moves", "items", "weak", "resist"];
-const MC_CATS = ["abilities", "offense", "defense", "builds"];
-const FLIP_CATS = ["stats", "natures", "natureChart"];
+const NATURE_SUBS = [
+  { key: "natureChart", label: "Boost + drop", hint: "tap both effects" },
+  { key: "natBoost", label: "Boost only", hint: "which stat it raises" },
+  { key: "natDrop", label: "Drop only", hint: "which stat it lowers" },
+  { key: "natGroupBoost", label: "Group: boosts", hint: "all natures raising a stat" },
+  { key: "natGroupDrop", label: "Group: drops", hint: "all natures lowering a stat" },
+];
+const SELECT_CATS = ["moves", "items", "weak", "resist", "natGroupBoost", "natGroupDrop"];
+const MC_CATS = ["abilities", "offense", "defense", "builds", "natBoost", "natDrop"];
+const FLIP_CATS = ["stats", "natures"];
+const NAT_TAP_CATS = ["natureChart"]; // dual-select tap: boost + drop
 
 const NATURE_CHART = [
   { name: "Adamant", plus: "atk", minus: "spa" },
@@ -1180,6 +1652,9 @@ const NATURE_CHART = [
   { name: "Bashful", plus: null, minus: null },
   { name: "Quirky", plus: null, minus: null },
 ];
+
+const NATURES_NONNEUTRAL = NATURE_CHART.filter(n => n.plus);
+const STAT_KEYS_MOD = ["atk", "def", "spa", "spd", "spe"]; // HP is never a nature stat
 
 const NATURE_PLUS_SPE = ["Timid", "Jolly", "Hasty", "Naive"];
 const NATURE_MINUS_SPE = ["Brave", "Quiet", "Relaxed", "Sassy"];
@@ -1392,12 +1867,39 @@ function buildDeck({ mons, count, skip, cat, statKey, doShuffle, abilSkipMono })
   }
 
   if (cat === "natureChart") {
-    NATURE_CHART.forEach(n => cards.push({ nature: n, cat: "natureChart" }));
+    // Tap-to-answer: pick the raised stat (red) and the lowered stat (blue).
+    // Neutral natures omitted.
+    NATURES_NONNEUTRAL.forEach(n => cards.push({ nature: n, cat }));
+  }
+
+  if (cat === "natBoost" || cat === "natDrop") {
+    const wanted = cat === "natBoost" ? "plus" : "minus";
+    NATURES_NONNEUTRAL.forEach(n => {
+      cards.push({
+        nature: n, cat,
+        options: STAT_KEYS_MOD.map(k => STAT_LABEL[k]),
+        correct: STAT_LABEL[n[wanted]],
+      });
+    });
+  }
+
+  if (cat === "natGroupBoost" || cat === "natGroupDrop") {
+    const field = cat === "natGroupBoost" ? "plus" : "minus";
+    // One card per stat: select every non-neutral nature that raises (or
+    // lowers) that stat. Entries are nature names; target is the matching set.
+    STAT_KEYS_MOD.forEach(k => {
+      const target = NATURES_NONNEUTRAL.filter(n => n[field] === k).map(n => n.name);
+      cards.push({
+        cat, statKey: k,
+        entries: shuffle(NATURES_NONNEUTRAL.map(n => ({ name: n.name }))),
+        target,
+      });
+    });
   }
 
   const deck = doShuffle ? shuffle(cards) : cards;
   return deck.map((c, i) => ({
-    id: `${c.mon ? c.mon.name : c.nature ? c.nature.name : c.type}|${c.cat}|${i}`,
+    id: `${c.mon ? c.mon.name : c.nature ? c.nature.name : c.type || c.statKey}|${c.cat}|${i}`,
     card: c, step: 0, lapses: 0, reviews: 0, correct: 0,
   }));
 }
@@ -1516,6 +2018,24 @@ function TypeChip({ t }) {
   );
 }
 
+function StatOrb({ statKey, size = 44 }) {
+  const c = STAT_COLOR[statKey] || "#8A8DA8";
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: `linear-gradient(135deg, ${c} 0%, ${c} 100%)`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      boxShadow: "inset 0 -3px 6px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.35)",
+      flexShrink: 0,
+    }} aria-hidden="true">
+      <span style={{
+        fontFamily: "var(--display)", fontWeight: 800, color: "rgba(255,255,255,.95)",
+        fontSize: size * 0.34, textShadow: "0 1px 2px rgba(0,0,0,.4)",
+      }}>{STAT_LABEL[statKey] || "?"}</span>
+    </div>
+  );
+}
+
 function NatureOrb({ nature, size = 44 }) {
   const c1 = nature.plus ? STAT_COLOR[nature.plus] : "#8A8DA8";
   const c2 = nature.minus ? STAT_COLOR[nature.minus] : "#8A8DA8";
@@ -1561,7 +2081,137 @@ function SubPill({ active, onClick, children, small, activeColor }) {
 
 /* ----------------------------- config screen ----------------------------- */
 
-function ConfigScreen({ formats, generated, live, onStart }) {
+function TeamPanel({ team, onImport, onClear }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const doImport = async () => {
+    const raw = text.trim();
+    if (!raw) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      let paste = raw;
+      // A bare pokepast.es link: try the /raw endpoint. Many browsers block
+      // this (no CORS headers on pokepast.es), so failure falls back to
+      // asking for the pasted text instead.
+      const urlMatch = raw.match(/^https?:\/\/pokepast\.es\/([A-Za-z0-9]+)/);
+      if (urlMatch && !raw.includes("\n")) {
+        try {
+          const r = await fetch(`https://pokepast.es/${urlMatch[1]}/raw`);
+          if (!r.ok) throw new Error("status " + r.status);
+          paste = await r.text();
+        } catch {
+          setBusy(false);
+          setMsg({ bad: true, text: "Couldn't load that link directly (pokepast.es blocks cross-site requests). Open the paste, copy the text, and paste it here instead." });
+          return;
+        }
+      }
+      const parsed = parseShowdownTeam(paste);
+      if (!parsed.length) {
+        setBusy(false);
+        setMsg({ bad: true, text: "No Pokémon found — paste a Showdown export (or a pokepast.es link)." });
+        return;
+      }
+      const res = await onImport(parsed);
+      setBusy(false);
+      if (res && res.mons.length) {
+        setText("");
+        setOpen(false);
+        setMsg(res.errors.length
+          ? { bad: false, text: `Imported ${res.mons.length}. Couldn't identify: ${res.errors.join(", ")}.` }
+          : null);
+      } else {
+        setMsg({ bad: true, text: "Couldn't look those species up — check spelling, or try again when online." });
+      }
+    } catch (err) {
+      setBusy(false);
+      setMsg({ bad: true, text: "Import failed: " + err.message });
+    }
+  };
+
+  return (
+    <div>
+      {team && team.mons.length > 0 ? (
+        <>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {team.mons.map(m => (
+              <div key={m.name + m.rank} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 62 }}>
+                <MonSprite mon={m} size={46} />
+                <span style={{ fontSize: 10.5, color: "#fff", textAlign: "center", lineHeight: 1.2, marginTop: 2 }}>
+                  {m.nickname || m.name}
+                </span>
+                {m.builds && m.builds[0] && m.builds[0].nature && (
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--muted)" }}>
+                    {m.builds[0].nature}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <SubPill small active={false} onClick={() => setOpen(o => !o)}>Replace</SubPill>
+            <SubPill small active={false} onClick={onClear}>Clear</SubPill>
+          </div>
+        </>
+      ) : (
+        !open && (
+          <button onClick={() => setOpen(true)} style={{
+            width: "100%", padding: "12px", borderRadius: 10, cursor: "pointer",
+            background: "rgba(255,255,255,.05)", border: "1.5px dashed rgba(255,255,255,.25)",
+            color: "#fff", fontSize: 14, fontWeight: 600,
+          }}>+ Import a team from Poképaste</button>
+        )
+      )}
+
+      {open && (
+        <div style={{ marginTop: 12 }}>
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder={"Paste your Showdown export here, e.g.\n\nGarchomp @ Life Orb\nAbility: Rough Skin\nEVs: 252 Atk / 252 Spe\nJolly Nature\n- Earthquake\n- Protect"}
+            rows={7}
+            style={{
+              width: "100%", boxSizing: "border-box", borderRadius: 10,
+              background: "rgba(0,0,0,.25)", color: "#fff",
+              border: "1px solid rgba(255,255,255,.18)", padding: "10px 12px",
+              fontFamily: "var(--mono)", fontSize: 12, lineHeight: 1.5, resize: "vertical",
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button onClick={doImport} disabled={busy || !text.trim()} style={{
+              flex: 1, padding: "11px", borderRadius: 10, border: "none",
+              background: busy || !text.trim() ? "rgba(255,255,255,.12)" : "var(--gold)",
+              color: busy || !text.trim() ? "rgba(255,255,255,.4)" : "#1B1D36",
+              fontWeight: 800, fontSize: 15, cursor: busy || !text.trim() ? "default" : "pointer",
+              fontFamily: "var(--display)", textTransform: "uppercase", letterSpacing: ".04em",
+            }}>{busy ? "Importing…" : "Import team"}</button>
+            <button onClick={() => { setOpen(false); setMsg(null); }} style={{
+              padding: "11px 16px", borderRadius: 10, cursor: "pointer",
+              background: "transparent", border: "1.5px solid rgba(255,255,255,.2)",
+              color: "#fff", fontSize: 14,
+            }}>Cancel</button>
+          </div>
+          <div style={{ color: "var(--muted)", fontSize: 11, marginTop: 8, lineHeight: 1.5 }}>
+            EVs work on either scale — Showdown's 0–252 or Champions' 0–32.
+            Base stats and types are looked up from PokéAPI on import.
+          </div>
+        </div>
+      )}
+
+      {msg && (
+        <div style={{
+          marginTop: 10, fontSize: 12.5, lineHeight: 1.5,
+          color: msg.bad ? "#FFB4B7" : "#9BE3B8",
+        }}>{msg.text}</div>
+      )}
+    </div>
+  );
+}
+
+function ConfigScreen({ formats, generated, live, team, onImportTeam, onClearTeam, onStart }) {
   const games = useMemo(() => [...new Set(formats.map(f => f.game))], [formats]);
   const [gameLabel, setGameLabel] = useState(games[0]);
   const regs = formats.filter(f => f.game === gameLabel);
@@ -1572,6 +2222,7 @@ function ConfigScreen({ formats, generated, live, onStart }) {
   const [statKey, setStatKey] = useState("spe");
   const [typeMatchKey, setTypeMatchKey] = useState("weak");
   const [profileKey, setProfileKey] = useState("offense");
+  const [natureKey, setNatureKey] = useState("natureChart");
   const [abilSkipMono, setAbilSkipMono] = useState(true);
   const [count, setCount] = useState(20);
   const [mastery, setMastery] = useState(false);
@@ -1583,18 +2234,42 @@ function ConfigScreen({ formats, generated, live, onStart }) {
   const [duelTarget, setDuelTarget] = useState(10);
   const [duelHard, setDuelHard] = useState(false);
   const [duelBuild, setDuelBuild] = useState("none");
+  const [dmgHard, setDmgHard] = useState(false);
+  const [matchSrc, setMatchSrc] = useState("meta"); // meta | teamVsMeta | team
+  const [showTeam, setShowTeam] = useState(false);
 
   const availableMons = expandPool(reg.mons, megaMode);
   const maxMons = availableMons.length;
-  const effCount = Math.max(1, Math.min(count, maxMons));
-  // Studying a chunk: skip the top N already-known threats. Clamped so the
-  // range always keeps at least one Pokémon in it.
-  const effSkip = useSkip ? Math.max(0, Math.min(skipTop, effCount - 1)) : 0;
-  const pool = availableMons.slice(effSkip, effCount);
+  // "Down to rank" sets the bottom of the range; "Omit top" sets the top.
+  // They're independent bounds: omit is clamped only by the pool size, never
+  // by count, so the two never collapse onto the same rank. The studied set
+  // is always ranks (effSkip+1)…effHi with no overlap between chunks.
+  // lo = how many top ranks to omit (0-based index of first studied mon).
+  // hi = "down to rank". When omit meets or passes hi, the studied window
+  // slides DOWN to keep its span: e.g. top=25, omit=25 -> ranks 26..50.
+  const lo = useSkip ? Math.max(0, Math.min(skipTop, maxMons - 1)) : 0;
+  let hiClamped = Math.max(1, Math.min(count, maxMons));
+  if (hiClamped <= lo) hiClamped = Math.min(maxMons, lo + (Math.max(1, Math.min(count, maxMons))));
+  const pool = availableMons.slice(lo, hiClamped);
+  const effCount = hiClamped;
 
   const catAvailable = (key) => {
     if (!pool.length) return false;
-    if (key === "natureChart") return true;
+    if (key === "natureQuiz") return true;
+    if (key === "damage") {
+      const md = { ...(reg.moveData || {}), ...((team && team.moveData) || {}) };
+      const srcPool = (
+        !hasTeam || matchSrc === "meta" ? pool
+        : matchSrc === "team" ? teamMons
+        : [...teamMons, ...pool]
+      );
+      const withStats = srcPool.filter(m => m.stats && m.types && m.types.length);
+      const hasDmgMove = withStats.some(m => (m.moves || []).some(e => {
+        const nm = typeof e === "string" ? e : e.name;
+        return md[nm] && md[nm].power != null && md[nm].class !== "status";
+      }));
+      return withStats.length >= 2 && hasDmgMove;
+    }
     if (key === "stats" || key === "speed" || key === "offense" || key === "defense")
       return pool.some(m => m.stats);
     if (key === "typematch") return true;
@@ -1605,19 +2280,38 @@ function ConfigScreen({ formats, generated, live, onStart }) {
     return pool.some(m => m[key] && m[key].length);
   };
 
-  const duelPool = pool.filter(m => m.stats);
+  const teamMons = (team && team.mons) || [];
+  const hasTeam = teamMons.length > 0;
+  // A team restored from storage arrives after mount, so reveal the panel
+  // when one shows up rather than only on the checkbox.
+  useEffect(() => { if (hasTeam) setShowTeam(true); }, [hasTeam]);
+  const effMatchSrc = hasTeam ? matchSrc : "meta";
+  // Speed/damage games draw from the studied meta slice, the imported team,
+  // or both. "teamVsMeta" keeps both sides available; games that need four
+  // Pokémon fall back to the combined set.
+  const duelPool = (
+    effMatchSrc === "team" ? teamMons.filter(m => m.stats)
+    : effMatchSrc === "teamVsMeta" ? [...teamMons.filter(m => m.stats), ...pool.filter(m => m.stats)]
+    : pool.filter(m => m.stats)
+  );
   const realAvailable = duelPool.some(m => m.builds && m.builds.length);
-  const effCat = cat === "typematch" ? typeMatchKey : cat === "profile" ? profileKey : cat;
+  const effCat = cat === "typematch" ? typeMatchKey
+    : cat === "profile" ? profileKey
+    : cat === "natureQuiz" ? natureKey
+    : cat;
   const deckPreview = cat !== "speed" && catAvailable(cat)
-    ? buildDeck({ mons: availableMons, count: effCount, skip: effSkip, cat: effCat, statKey, doShuffle: false, abilSkipMono })
+    ? buildDeck({ mons: availableMons, count: effCount, skip: lo, cat: effCat, statKey, doShuffle: false, abilSkipMono })
     : [];
   const canStart = cat === "speed"
     ? duelPool.length >= (duelVariant === "faster" ? 2 : 4)
-    : deckPreview.length > 0;
+    : cat === "damage"
+      ? catAvailable("damage")
+      : deckPreview.length > 0;
 
   const startLabel = cat === "speed"
     ? (duelVariant === "order" ? (duelHard ? "Start hard mode" : "Start turn order")
       : duelVariant === "scarf" ? "Start scarf hunt" : "Start speed duel")
+    : cat === "damage" ? (dmgHard ? "Start hard mode" : "Start damage drill")
     : "Start drilling";
 
   return (
@@ -1683,11 +2377,11 @@ function ConfigScreen({ formats, generated, live, onStart }) {
       {/* pool */}
       <section style={panelStyle}>
         <div style={panelHeadStyle}>
-          <span>{effSkip ? "Usage ranks to study" : "Top Pokémon to study"}</span>
+          <span>{lo ? "Usage ranks to study" : "Top Pokémon to study"}</span>
           <span style={{
-            fontFamily: "var(--display)", fontWeight: 800, fontSize: effSkip ? 26 : 30,
+            fontFamily: "var(--display)", fontWeight: 800, fontSize: lo ? 26 : 30,
             color: "var(--gold)", lineHeight: 1,
-          }}>{maxMons ? (effSkip ? `${effSkip + 1}–${effCount}` : effCount) : 0}</span>
+          }}>{maxMons ? (lo ? `${lo + 1}–${effCount}` : effCount) : 0}</span>
         </div>
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
           {[
@@ -1715,7 +2409,7 @@ function ConfigScreen({ formats, generated, live, onStart }) {
               <span>{effCount}</span>
             </div>
             <input
-              type="range" min={Math.min(5, maxMons)} max={maxMons} step={1} value={effCount}
+              type="range" min={1} max={maxMons} step={1} value={effCount}
               onChange={e => setCount(Number(e.target.value))}
               style={{ width: "100%", accentColor: "#FFCB05" }}
               aria-label="Study down to this usage rank"
@@ -1745,14 +2439,14 @@ function ConfigScreen({ formats, generated, live, onStart }) {
                   fontFamily: "var(--mono)", fontSize: 10.5, color: "rgba(255,255,255,.4)",
                   letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 2,
                 }}>
-                  <span>Skip the top</span>
-                  <span>{effSkip}</span>
+                  <span>Omit the top</span>
+                  <span>{lo}</span>
                 </div>
                 <input
-                  type="range" min={0} max={Math.max(0, effCount - 1)} step={1} value={effSkip}
+                  type="range" min={0} max={Math.max(0, maxMons - 1)} step={1} value={effSkip}
                   onChange={e => setSkipTop(Number(e.target.value))}
                   style={{ width: "100%", accentColor: "#E8913A" }}
-                  aria-label="Number of top-ranked Pokémon to skip"
+                  aria-label="Number of top-ranked Pokémon to omit"
                 />
               </div>
             )}
@@ -1763,13 +2457,37 @@ function ConfigScreen({ formats, generated, live, onStart }) {
               ))}
             </div>
             <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 8 }}>
-              {effSkip
-                ? `Ranks ${effSkip + 1}–${effCount} · ${pool.length} Pokémon`
+              {lo
+                ? `Ranks ${lo + 1}–${effCount} · ${pool.length} Pokémon`
                 : `Top ${effCount} by usage`}
               {megaMode !== "include" ? ` (${megaMode === "only" ? "Mega users only" : "Megas excluded"})` : ""}
-              {effSkip ? ` · ${pool[0].name} → ${pool[pool.length - 1].name}` : ` · last is ${pool[pool.length - 1].name}`}
+              {lo ? ` · ${pool[0].name} → ${pool[pool.length - 1].name}` : ` · last is ${pool[pool.length - 1].name}`}
             </div>
           </>
+        )}
+      </section>
+
+      <section style={{ ...panelStyle, paddingTop: 12, paddingBottom: showTeam ? 16 : 12, marginBottom: showTeam ? 14 : 14 }}>
+        <label
+          style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", color: "#fff", fontSize: 14 }}
+          onClick={() => setShowTeam(v => !v)}
+        >
+          <span style={{
+            width: 17, height: 17, borderRadius: 4, flexShrink: 0,
+            border: `2px solid ${showTeam ? "var(--gold)" : "rgba(255,255,255,.35)"}`,
+            background: showTeam ? "var(--gold)" : "transparent",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#1B1D36", fontSize: 11, fontWeight: 900,
+          }}>{showTeam ? "✓" : ""}</span>
+          <span style={{ fontWeight: 600 }}>Use my own team</span>
+          <span style={{ color: "var(--muted)", fontSize: 12, marginLeft: "auto", textAlign: "right" }}>
+            {hasTeam ? `${teamMons.length} imported` : "import a Poképaste"}
+          </span>
+        </label>
+        {showTeam && (
+          <div style={{ marginTop: 12 }}>
+            <TeamPanel team={team} onImport={onImportTeam} onClear={onClearTeam} />
+          </div>
         )}
       </section>
 
@@ -1835,6 +2553,19 @@ function ConfigScreen({ formats, generated, live, onStart }) {
                   </div>
                 )}
 
+                {c.key === "natureQuiz" && on && (
+                  <div style={{ margin: "8px 0 4px 30px", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                    {NATURE_SUBS.map(s => (
+                      <SubPill key={s.key} small active={natureKey === s.key} onClick={() => setNatureKey(s.key)}>
+                        {s.label}
+                      </SubPill>
+                    ))}
+                    <span style={{ color: "var(--muted)", fontSize: 12, width: "100%", marginTop: 2 }}>
+                      {(NATURE_SUBS.find(s => s.key === natureKey) || {}).hint} · neutral natures omitted
+                    </span>
+                  </div>
+                )}
+
                 {c.key === "typematch" && on && (
                   <div style={{ margin: "8px 0 4px 30px", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                     <SubPill small active={typeMatchKey === "weak"} onClick={() => setTypeMatchKey("weak")}>
@@ -1865,6 +2596,65 @@ function ConfigScreen({ formats, generated, live, onStart }) {
                   </label>
                 )}
 
+                {c.key === "damage" && on && (
+                  <div style={{
+                    margin: "8px 0 4px 30px", padding: "12px",
+                    background: "rgba(255,255,255,.03)", borderRadius: 10,
+                    border: "1px solid rgba(255,255,255,.08)",
+                    display: "flex", flexDirection: "column", gap: 12,
+                  }}>
+                    {hasTeam && (
+                      <div>
+                        <div style={{
+                          fontFamily: "var(--mono)", fontSize: 11, letterSpacing: ".12em",
+                          textTransform: "uppercase", color: "rgba(255,255,255,.5)", marginBottom: 6,
+                        }}>Matchups from</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          <SubPill small active={matchSrc === "meta"} onClick={() => setMatchSrc("meta")}>Meta only</SubPill>
+                          <SubPill small active={matchSrc === "teamVsMeta"} onClick={() => setMatchSrc("teamVsMeta")}>My team + meta</SubPill>
+                          <SubPill small active={matchSrc === "team"} onClick={() => setMatchSrc("team")}>My team only</SubPill>
+                        </div>
+                      </div>
+                    )}
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 13.5, cursor: "pointer" }}
+                      onClick={() => setDmgHard(v => !v)}>
+                      <span style={{
+                        width: 16, height: 16, borderRadius: 4,
+                        border: `2px solid ${dmgHard ? "#E5484D" : "rgba(255,255,255,.35)"}`,
+                        background: dmgHard ? "#E5484D" : "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color: "#fff", fontSize: 10, fontWeight: 900,
+                      }}>{dmgHard ? "✓" : ""}</span>
+                      🔥 Hard mode
+                      <span style={{ color: "var(--muted)", fontSize: 11, marginLeft: "auto" }}>
+                        real EVs · items · abilities · natures
+                      </span>
+                    </label>
+                    <div style={{ color: "var(--muted)", fontSize: 11.5, lineHeight: 1.5 }}>
+                      {dmgHard
+                        ? "Attacker and defender use their top EV spread, a random real held item, their ability, and (once fixed) their nature. The move's damage class picks the stats."
+                        : "Base stats only — no EVs, items, abilities, or natures. Pure type + base-power intuition."}
+                    </div>
+                    <div>
+                      <div style={{ ...panelHeadStyle, marginBottom: 8 }}><span>Correct calls to finish</span></div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {DUEL_TARGETS.map(tg => {
+                          const ton = duelTarget === tg;
+                          return (
+                            <button key={tg} onClick={() => setDuelTarget(tg)} style={{
+                              flex: 1, padding: "9px 4px", borderRadius: 10, cursor: "pointer",
+                              background: ton ? "var(--gold)" : "rgba(255,255,255,.05)",
+                              border: `1.5px solid ${ton ? "var(--gold)" : "rgba(255,255,255,.14)"}`,
+                              color: ton ? "#1B1D36" : "#fff",
+                              fontFamily: "var(--display)", fontWeight: 800, fontSize: 20, lineHeight: 1,
+                            }}>{tg}</button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {c.key === "speed" && on && (
                   <div style={{
                     margin: "8px 0 4px 30px", padding: "12px",
@@ -1872,6 +2662,19 @@ function ConfigScreen({ formats, generated, live, onStart }) {
                     border: "1px solid rgba(255,255,255,.08)",
                     display: "flex", flexDirection: "column", gap: 12,
                   }}>
+                    {hasTeam && (
+                      <div>
+                        <div style={{
+                          fontFamily: "var(--mono)", fontSize: 11, letterSpacing: ".12em",
+                          textTransform: "uppercase", color: "rgba(255,255,255,.5)", marginBottom: 6,
+                        }}>Matchups from</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          <SubPill small active={matchSrc === "meta"} onClick={() => setMatchSrc("meta")}>Meta only</SubPill>
+                          <SubPill small active={matchSrc === "teamVsMeta"} onClick={() => setMatchSrc("teamVsMeta")}>My team + meta</SubPill>
+                          <SubPill small active={matchSrc === "team"} onClick={() => setMatchSrc("team")}>My team only</SubPill>
+                        </div>
+                      </div>
+                    )}
                     <div style={{ display: "flex", gap: 8 }}>
                       {[
                         { id: "faster", title: "1v1 Duel", sub: "pick the faster mon" },
@@ -1970,7 +2773,7 @@ function ConfigScreen({ formats, generated, live, onStart }) {
         </div>
       </section>
 
-      {cat !== "speed" && (
+      {cat !== "speed" && cat !== "damage" && (
         <section style={panelStyle}>
           <div style={panelHeadStyle}><span>Session goal</span></div>
           <div style={{ display: "flex", gap: 6 }}>
@@ -1989,7 +2792,10 @@ function ConfigScreen({ formats, generated, live, onStart }) {
         disabled={!canStart}
         onClick={() => onStart(cat === "speed"
           ? { type: "duel", reg, pool: duelPool, duelCfg: { target: duelTarget, variant: duelVariant, hard: duelHard, buildStyle: duelBuild } }
-          : { type: "flash", reg, pool, deckCfg: { mons: availableMons, count: effCount, skip: effSkip, cat: effCat, statKey, doShuffle: true, abilSkipMono }, mastery }
+          : cat === "damage"
+          ? { type: "damage", reg, pool: duelPool, dmgCfg: { target: duelTarget, hard: dmgHard },
+              moveData: { ...(reg.moveData || {}), ...((team && team.moveData) || {}) } }
+          : { type: "flash", reg, pool, deckCfg: { mons: availableMons, count: effCount, skip: lo, cat: effCat, statKey, doShuffle: true, abilSkipMono }, mastery }
         )}
         style={{
           width: "100%", marginTop: 6, padding: "16px", borderRadius: 12, border: "none",
@@ -2173,6 +2979,119 @@ function TypeGridSelect({ multOf, target, picks, onToggle, submitted }) {
   );
 }
 
+/* natureChart tap game: pick the boosted stat (red) then the dropped stat
+   (blue), from the five modifiable stats. Two independent selections. */
+function NatureTapGrid({ nature, boostPick, dropPick, onPick, submitted }) {
+  const stats = STAT_KEYS_MOD;
+  const phase = boostPick == null ? "boost" : "drop";
+  return (
+    <div>
+      {!submitted && (
+        <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8,
+          color: phase === "boost" ? "#C0353A" : "#2D6BD4" }}>
+          {phase === "boost" ? "1 · Tap the stat it RAISES (+10%)" : "2 · Tap the stat it LOWERS (−10%)"}
+        </div>
+      )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {stats.map(k => {
+          const isBoost = boostPick === k, isDrop = dropPick === k;
+          const correctBoost = submitted && nature.plus === k;
+          const correctDrop = submitted && nature.minus === k;
+          let bg = "#fff", border = "#D5D8E4", color = "#22243E", ring = "transparent";
+          if (!submitted) {
+            if (isBoost) { bg = "rgba(229,72,77,.14)"; border = "#E5484D"; color = "#C0353A"; }
+            else if (isDrop) { bg = "rgba(74,143,231,.14)"; border = "#2D6BD4"; color = "#2D6BD4"; }
+          } else {
+            if (correctBoost) { bg = "rgba(229,72,77,.16)"; border = "#E5484D"; color = "#C0353A"; }
+            else if (correctDrop) { bg = "rgba(74,143,231,.16)"; border = "#2D6BD4"; color = "#2D6BD4"; }
+            else { color = "#9DA0B8"; }
+            // mark a wrong pick
+            if (isBoost && !correctBoost) ring = "#E5484D";
+            if (isDrop && !correctDrop) ring = "#2D6BD4";
+          }
+          return (
+            <button key={k} onClick={() => onPick(k)} disabled={submitted}
+              style={{
+                minWidth: 66, padding: "12px 10px", borderRadius: 10,
+                background: bg, border: `2px solid ${border}`, outline: ring === "transparent" ? "none" : `3px solid ${ring}`,
+                color, cursor: submitted ? "default" : "pointer",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+              }}>
+              <span style={{ fontFamily: "var(--display)", fontWeight: 800, fontSize: 20, lineHeight: 1 }}>
+                {STAT_LABEL[k]}
+              </span>
+              {submitted && (correctBoost || correctDrop) && (
+                <span style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700 }}>
+                  {correctBoost ? "+10%" : "−10%"}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {submitted && (
+        <div style={{ marginTop: 12, fontSize: 14, color: "#4A4D6B",
+          borderLeft: "3px solid #FFCB05", paddingLeft: 12, lineHeight: 1.6 }}>
+          <b>{nature.name}</b>: <span style={{ color: "#C0353A", fontWeight: 700 }}>+{STAT_LABEL[nature.plus]}</span>
+          {" / "}<span style={{ color: "#2D6BD4", fontWeight: 700 }}>−{STAT_LABEL[nature.minus]}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Group games: entries are nature names; select every one that raises (or
+   lowers) the target stat. Reuses the SelectRows look but keyed on natures. */
+function NatureGroupSelect({ entries, target, picks, onToggle, submitted, accent }) {
+  const targetSet = new Set(target);
+  let right = 0, wrong = 0, missed = 0;
+  if (submitted) {
+    entries.forEach(e => {
+      const isT = targetSet.has(e.name), isP = picks.has(e.name);
+      if (isT && isP) right++; else if (!isT && isP) wrong++; else if (isT && !isP) missed++;
+    });
+  }
+  return (
+    <div>
+      {submitted && (
+        <div style={{ fontSize: 13.5, fontWeight: 800, marginBottom: 8,
+          color: wrong + missed === 0 ? "#1E7A4D" : "#C0353A" }}>
+          {wrong + missed === 0 ? "Perfect! 🎯" : `${right} right · ${missed} missed · ${wrong} wrong`}
+        </div>
+      )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+        {entries.map(e => {
+          const isP = picks.has(e.name), isT = targetSet.has(e.name);
+          let bg = "#fff", border = "#D5D8E4", color = "#22243E";
+          if (!submitted && isP) { border = accent; bg = accent + "22"; color = accent; }
+          if (submitted) {
+            if (isT && isP) { border = "#30A46C"; bg = "rgba(48,164,108,.12)"; color = "#1E7A4D"; }
+            else if (!isT && isP) { border = "#E5484D"; bg = "rgba(229,72,77,.10)"; color = "#C0353A"; }
+            else if (isT && !isP) { border = "#E8913A"; bg = "rgba(232,145,58,.14)"; color = "#8A5A1A"; }
+            else { color = "#9DA0B8"; }
+          }
+          return (
+            <button key={e.name} onClick={() => onToggle(e.name)} disabled={submitted}
+              style={{
+                padding: "8px 12px", borderRadius: 9, background: bg,
+                border: `1.5px solid ${border}`, color,
+                fontSize: 14, fontWeight: submitted && isT ? 800 : 600,
+                cursor: submitted ? "default" : "pointer",
+              }}>
+              {e.name}
+            </button>
+          );
+        })}
+      </div>
+      {!submitted && (
+        <div style={{ fontSize: 11.5, color: "#9DA0B8", marginTop: 8 }}>
+          Tap every matching nature, then check below.
+        </div>
+      )}
+    </div>
+  );
+}
+
 const abilityBlurbCache = {};
 function AbilityBlurb({ name }) {
   const key = name.toLowerCase();
@@ -2271,7 +3190,9 @@ function MCOptions({ card, picked, onPick, submitted }) {
 
 const CAT_PROMPT = {
   natures: "Most common natures?",
-  natureChart: "Raises what, lowers what?",
+  natureChart: "Tap the boosted stat, then the dropped stat",
+  natBoost: "Which stat does this nature raise?",
+  natDrop: "Which stat does this nature lower?",
   moves: "Select every move over 30% usage",
   items: "Select every item over 10% usage",
   abilities: "Most common ability?",
@@ -2280,7 +3201,9 @@ const CAT_PROMPT = {
   defense: "Physically or specially bulkier?",
 };
 const CAT_SHORT = {
-  natureChart: "nature", weak: "super effective", resist: "resists", builds: "build",
+  natureChart: "nature +/−", natBoost: "boost", natDrop: "drop",
+  natGroupBoost: "boost group", natGroupDrop: "drop group",
+  weak: "super effective", resist: "resists", builds: "build",
   offense: "offense", defense: "defense", abilities: "ability",
 };
 
@@ -2298,6 +3221,8 @@ function QuizScreen({ initialQueue, pool, reg, mastery, onDone, onQuit }) {
   const [flipped, setFlipped] = useState(false);
   const [log, setLog] = useState({ again: 0, hard: 0, good: 0, easy: 0 });
   const [picks, setPicks] = useState(new Set());
+  const [natBoostPick, setNatBoostPick] = useState(null);
+  const [natDropPick, setNatDropPick] = useState(null);
   const [wasRight, setWasRight] = useState(false);
 
   const item = queue[0];
@@ -2365,6 +3290,8 @@ function QuizScreen({ initialQueue, pool, reg, mastery, onDone, onQuit }) {
     setLog(nextLog);
     setFlipped(false);
     setPicks(new Set());
+    setNatBoostPick(null);
+    setNatDropPick(null);
     setWasRight(false);
   };
 
@@ -2389,11 +3316,16 @@ function QuizScreen({ initialQueue, pool, reg, mastery, onDone, onQuit }) {
   const isFlipCat = FLIP_CATS.includes(card.cat);
   const isSelectCat = SELECT_CATS.includes(card.cat);
   const isMcCat = MC_CATS.includes(card.cat);
+  const isNatTap = NAT_TAP_CATS.includes(card.cat);
   const newCount = queue.filter(q => q.reviews === 0).length;
   const learningCount = queue.length - newCount;
 
   const prompt = card.cat === "stats"
     ? `Base ${STAT_LABEL[card.statKey]}?`
+    : card.cat === "natGroupBoost"
+      ? `Select every nature that RAISES ${STAT_LABEL[card.statKey]}`
+      : card.cat === "natGroupDrop"
+        ? `Select every nature that LOWERS ${STAT_LABEL[card.statKey]}`
     : card.cat === "weak"
       ? `Select every type ${card.type.toUpperCase()} hits super effectively`
       : card.cat === "resist"
@@ -2431,6 +3363,19 @@ function QuizScreen({ initialQueue, pool, reg, mastery, onDone, onQuit }) {
     const targetSet = new Set(card.target);
     setWasRight(names.every(n => targetSet.has(n) === picks.has(n)));
     setFlipped(true);
+  };
+  const natTapPick = (statKey) => {
+    if (flipped) return;
+    if (natBoostPick == null) {
+      setNatBoostPick(statKey);
+    } else if (statKey === natBoostPick) {
+      setNatBoostPick(null); // tapping the boost again deselects it
+    } else {
+      const right = statKey === card.nature.minus && natBoostPick === card.nature.plus;
+      setNatDropPick(statKey);
+      setWasRight(right);
+      setFlipped(true);
+    }
   };
 
   return (
@@ -2474,12 +3419,16 @@ function QuizScreen({ initialQueue, pool, reg, mastery, onDone, onQuit }) {
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {card.mon ? <MonSprite mon={card.mon} size={56} />
             : card.nature ? <NatureOrb nature={card.nature} size={56} />
-            : <TypeOrb types={[card.type]} size={56} text={card.type[0].toUpperCase()} />}
+            : card.type ? <TypeOrb types={[card.type]} size={56} text={card.type[0].toUpperCase()} />
+            : <StatOrb statKey={card.statKey} size={56} />}
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{
               fontFamily: "var(--display)", fontWeight: 800, fontSize: 30, lineHeight: 1.02,
               textTransform: "uppercase", letterSpacing: ".01em", overflowWrap: "anywhere",
-            }}>{card.mon ? card.mon.name : card.nature ? card.nature.name : cap(card.type)}</div>
+            }}>{card.mon ? card.mon.name
+              : card.nature ? card.nature.name
+              : card.type ? cap(card.type)
+              : STAT_LABEL[card.statKey] || "Stat"}</div>
             {card.mon ? (
               <div style={{ display: "flex", gap: 6, marginTop: 5, alignItems: "center", flexWrap: "wrap" }}>
                 {monTypes(card.mon).filter(t => t !== "unknown").map(t => <TypeChip key={t} t={t} />)}
@@ -2496,7 +3445,10 @@ function QuizScreen({ initialQueue, pool, reg, mastery, onDone, onQuit }) {
               <div style={{ marginTop: 5, display: "flex", gap: 6, alignItems: "center" }}>
                 {card.type && <TypeChip t={card.type} />}
                 <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "#8A8DA8" }}>
-                  {card.type ? "type matchup" : "nature chart"}
+                  {card.type ? "type matchup"
+                    : card.cat === "natGroupBoost" ? "which natures raise this?"
+                    : card.cat === "natGroupDrop" ? "which natures lower this?"
+                    : "nature chart"}
                 </span>
               </div>
             )}
@@ -2515,7 +3467,24 @@ function QuizScreen({ initialQueue, pool, reg, mastery, onDone, onQuit }) {
           textTransform: "uppercase", color: "#8A8DA8", marginBottom: 10,
         }}>{prompt}</div>
 
-        {isSelectCat && (card.cat === "weak" || card.cat === "resist") ? (
+        {isNatTap ? (
+          <NatureTapGrid
+            nature={card.nature}
+            boostPick={natBoostPick}
+            dropPick={natDropPick}
+            onPick={natTapPick}
+            submitted={flipped}
+          />
+        ) : (card.cat === "natGroupBoost" || card.cat === "natGroupDrop") ? (
+          <NatureGroupSelect
+            entries={card.entries}
+            target={card.target}
+            picks={picks}
+            onToggle={togglePick}
+            submitted={flipped}
+            accent={card.cat === "natGroupBoost" ? "#E5484D" : "#2D6BD4"}
+          />
+        ) : isSelectCat && (card.cat === "weak" || card.cat === "resist") ? (
           <TypeGridSelect
             multOf={(tp) => {
               const eff = (a, d) => (TYPE_CHART[a][d] === undefined ? 1 : TYPE_CHART[a][d]);
@@ -2599,10 +3568,10 @@ function QuizScreen({ initialQueue, pool, reg, mastery, onDone, onQuit }) {
             background: "transparent", color: "#fff", fontWeight: 700, fontSize: 16,
             cursor: "pointer", padding: "14px",
           }}>Check answer ({picks.size} selected)</button>
-        ) : isMcCat ? (
+        ) : (isMcCat || isNatTap) ? (
           <div style={{
             textAlign: "center", color: "var(--muted)", fontSize: 13, paddingTop: 14,
-          }}>Pick an answer on the card</div>
+          }}>{isNatTap ? "Tap the boosted, then the dropped stat" : "Pick an answer on the card"}</div>
         ) : (
           <button onClick={() => setFlipped(true)} style={{
             width: "100%", borderRadius: 12, border: "1.5px solid rgba(255,255,255,.25)",
@@ -3600,6 +4569,287 @@ function ScarfHuntScreen({ pool, target, hard, buildStyle, onDone, onQuit }) {
   );
 }
 
+/* --------------------------- damage buckets --------------------------- */
+
+const MEGA_STONE_RE = /ite(?: [XY])?$/;
+function moveDataFor(md, name) {
+  return (md || {})[name] || null;
+}
+/* Build one damage question: random attacker + defender from the pool, a
+   random damaging move the attacker actually runs. Returns null if it can't
+   find a valid combo (caller retries). */
+function buildDamageRound(pool, moveData, prevKey, hard) {
+  const usable = pool.filter(m => m.stats && m.types && m.types.length);
+  for (let tries = 0; tries < 60; tries++) {
+    const attacker = usable[Math.floor(Math.random() * usable.length)];
+    const defender = usable[Math.floor(Math.random() * usable.length)];
+    if (attacker.name === defender.name) continue;
+    const key = attacker.name + ">" + defender.name;
+    if (key === prevKey && tries < 40) continue;
+
+    const dmgMoves = (attacker.moves || [])
+      .map(e => (typeof e === "string" ? e : e.name))
+      .map(nm => ({ name: nm, data: moveDataFor(moveData, nm) }))
+      .filter(x => x.data && x.data.power != null && x.data.class !== "status");
+    if (!dmgMoves.length) continue;
+    const move = dmgMoves[Math.floor(Math.random() * dmgMoves.length)];
+
+    const opts = {};
+    if (hard) {
+      const topBuild = (m) => (m.builds || [])[0] || null;
+      const evOf = (m, key) => {
+        const b = topBuild(m);
+        if (!b) return 0;
+        const parts = String(b.evs || "").split("/").map(n => parseInt(n, 10));
+        const idx = { hp: 0, atk: 1, def: 2, spa: 3, spd: 4, spe: 5 }[key];
+        return parts.length === 6 && !isNaN(parts[idx]) ? parts[idx] : 0;
+      };
+      const cls = move.data.class;
+      opts.atkEV = evOf(attacker, cls === "physical" ? "atk" : "spa");
+      opts.defEV = evOf(defender, cls === "physical" ? "def" : "spd");
+      opts.defHpEV = evOf(defender, "hp");
+      // nature multipliers on the relevant stats (real natures; blank today)
+      const natMult = (m) => {
+        const b = topBuild(m);
+        if (!b || !b.nature) return {};
+        const nat = NATURE_CHART.find(n => n.name === b.nature);
+        if (!nat || !nat.plus) return {};
+        const out = {};
+        out[nat.plus] = 1.1; out[nat.minus] = 0.9;
+        return out;
+      };
+      opts.atkNatureMult = natMult(attacker);
+      opts.defNatureMult = natMult(defender);
+      // real held items (mega -> stone only, else a >10% item)
+      const pickItem = (m) => {
+        // Imported team members always use the exact item on their set.
+        if (m.isTeam) return (m.teamSet && m.teamSet.item) || null;
+        if ((m.megas && m.isMega) || MEGA_NAME.test(m.name)) {
+          return (m.items || []).map(norm).map(e => e.name).find(n => MEGA_STONE_RE.test(n) && n !== "Eviolite") || null;
+        }
+        const opts2 = (m.items || []).map(norm).filter(e => e.pct != null && e.pct > 10).map(e => e.name);
+        return opts2.length ? opts2[Math.floor(Math.random() * opts2.length)] : null;
+      };
+      opts.atkItem = pickItem(attacker);
+      opts.defItem = pickItem(defender);
+      opts.atkAbility = (attacker.abilities || []).map(norm)[0] && norm((attacker.abilities || [])[0]).name;
+      opts.defAbility = (defender.abilities || []).map(norm)[0] && norm((defender.abilities || [])[0]).name;
+    }
+
+    const res = calcDamage(attacker, defender, move.data, opts);
+    if (!res) continue;
+    return { attacker, defender, move, res, opts, key, correct: bucketsForResult(res) };
+  }
+  return null;
+}
+
+function DamageScreen({ pool, moveData, target, hard, onDone, onQuit }) {
+  const [round, setRound] = useState(() => buildDamageRound(pool, moveData, null, hard));
+  const [picked, setPicked] = useState(null);
+  const [wins, setWins] = useState(0);
+  const [attempts, setAttempts] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+
+  if (!round) {
+    return (
+      <div style={{ maxWidth: 560, margin: "0 auto", padding: "40px 18px", textAlign: "center", color: "#fff" }}>
+        <p style={{ color: "var(--muted)" }}>
+          Not enough move data yet to build damage questions. This unlocks once the
+          nightly pull adds base-power data for these Pokémon's moves.
+        </p>
+        <button onClick={onQuit} style={{
+          marginTop: 16, padding: "12px 20px", borderRadius: 12, border: "none",
+          background: "var(--gold)", color: "#1B1D36", fontWeight: 800, cursor: "pointer",
+          fontFamily: "var(--display)", fontSize: 18, textTransform: "uppercase",
+        }}>Back</button>
+      </div>
+    );
+  }
+
+  const { attacker, defender, move, res, opts, correct } = round;
+  const answered = picked !== null;
+  const correctSet = new Set(correct);
+  const wasRight = answered && correctSet.has(picked);
+
+  const choose = (key) => {
+    if (answered) return;
+    setPicked(key);
+    setAttempts(n => n + 1);
+    if (correctSet.has(key)) {
+      setWins(w => w + 1);
+      setStreak(s => { const ns = s + 1; setBestStreak(b => Math.max(b, ns)); return ns; });
+    } else {
+      setStreak(0);
+    }
+  };
+  const next = () => {
+    if (wasRight && wins >= target) { onDone({ target, attempts, bestStreak }); return; }
+    setPicked(null);
+    setRound(buildDamageRound(pool, moveData, round.key, hard));
+  };
+
+  const rollText = res.immune
+    ? "Immune — 0%"
+    : `${res.min.toFixed(1)}%–${res.max.toFixed(1)}%`;
+
+  const chipRow = (m, role) => {
+    const item = role === "atk" ? opts.atkItem : opts.defItem;
+    const ability = role === "atk" ? opts.atkAbility : opts.defAbility;
+    return hard && (item || ability) ? (
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "center", marginTop: 3 }}>
+        {item && <ModChip text={item} bg="#4A6FA5" />}
+        {ability && <ModChip text={ability} bg="#6B4A8A" />}
+      </div>
+    ) : null;
+  };
+
+  const monBlock = (m, role) => (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
+      <div style={{ position: "relative" }}>
+        <MonSprite mon={m} size={72} />
+        {m.isTeam && (
+          <span style={{
+            position: "absolute", top: -2, right: -6, background: "var(--gold)", color: "#1B1D36",
+            borderRadius: 999, padding: "1px 6px", fontSize: 9, fontWeight: 900,
+            letterSpacing: ".06em", textTransform: "uppercase",
+          }}>yours</span>
+        )}
+      </div>
+      <div style={{
+        fontFamily: "var(--display)", fontWeight: 800, fontSize: 16, lineHeight: 1.05,
+        textTransform: "uppercase", textAlign: "center", overflowWrap: "anywhere", color: "#22243E",
+      }}>{m.nickname || m.name}</div>
+      <div style={{ display: "flex", gap: 3, flexWrap: "wrap", justifyContent: "center" }}>
+        {monTypes(m).filter(x => x !== "unknown").map(x => <TypeChip key={x} t={x} />)}
+      </div>
+      {chipRow(m, role)}
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth: 560, margin: "0 auto", padding: "18px 18px 40px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+        <button onClick={onQuit} style={{
+          background: "transparent", border: "none", color: "var(--muted)",
+          fontSize: 13, cursor: "pointer", padding: 4,
+        }}>← End</button>
+        <div style={{ flex: 1, height: 6, background: "rgba(255,255,255,.1)", borderRadius: 999 }}>
+          <div style={{
+            width: `${(wins / target) * 100}%`, height: "100%",
+            background: "var(--gold)", borderRadius: 999, transition: "width .25s",
+          }} />
+        </div>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--muted)" }}>
+          {wins}/{target}
+        </span>
+      </div>
+      <div style={{
+        display: "flex", justifyContent: "flex-end", marginBottom: 10,
+        fontFamily: "var(--mono)", fontSize: 12, color: streak >= 3 ? "var(--gold)" : "var(--muted)",
+      }}>{streak > 0 ? `🔥 ${streak} streak` : " "}</div>
+
+      <div style={{
+        background: "#F5F6FA", borderRadius: 18, padding: "18px 16px",
+        boxShadow: "0 10px 30px rgba(0,0,0,.45)",
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          {monBlock(attacker, "atk")}
+          <div style={{
+            alignSelf: "center", fontFamily: "var(--display)", fontWeight: 800,
+            fontSize: 15, color: "#8A8DA8", padding: "0 2px",
+          }}>▶</div>
+          {monBlock(defender, "def")}
+        </div>
+
+        <div style={{
+          marginTop: 14, textAlign: "center", padding: "10px 12px",
+          background: "#fff", borderRadius: 12, border: "1px solid #E4E6F0",
+        }}>
+          <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "#8A8DA8", letterSpacing: ".1em", textTransform: "uppercase" }}>
+            {attacker.name} uses
+          </span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 4 }}>
+            <span style={{ fontFamily: "var(--display)", fontWeight: 800, fontSize: 24, color: "#22243E" }}>
+              {move.name}
+            </span>
+            <TypeChip t={move.data.type} />
+            <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: "#8A8DA8" }}>
+              {move.data.power} BP · {move.data.class === "physical" ? "Phys" : "Spec"}
+            </span>
+          </div>
+        </div>
+
+        <div style={{
+          fontFamily: "var(--mono)", fontSize: 12, letterSpacing: ".1em",
+          textTransform: "uppercase", color: "#8A8DA8", margin: "16px 0 10px", textAlign: "center",
+        }}>How much of {defender.name}'s HP?</div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          {DMG_BUCKETS.map(b => {
+            const isCorrect = correctSet.has(b.key);
+            const isPicked = picked === b.key;
+            let bg = "#fff", border = "#D5D8E4", color = "#22243E";
+            if (answered) {
+              if (isCorrect) { bg = "rgba(48,164,108,.14)"; border = "#30A46C"; color = "#1E7A4D"; }
+              else if (isPicked) { bg = "rgba(229,72,77,.10)"; border = "#E5484D"; color = "#C0353A"; }
+              else { color = "#9DA0B8"; }
+            }
+            return (
+              <button key={b.key} onClick={() => choose(b.key)} disabled={answered}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, textAlign: "left",
+                  background: bg, border: `1.5px solid ${border}`, borderRadius: 10,
+                  padding: "12px 14px", cursor: answered ? "default" : "pointer", color,
+                  fontSize: 16, fontWeight: answered && isCorrect ? 800 : 600,
+                }}>
+                {b.label}
+                {answered && isCorrect && <span style={{ marginLeft: "auto", fontSize: 13 }}>✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        {answered ? (
+          <>
+            <div style={{
+              borderRadius: 12, padding: "12px 14px", marginBottom: 10,
+              background: wasRight ? "rgba(48,164,108,.15)" : "rgba(229,72,77,.15)",
+              border: `1.5px solid ${wasRight ? "#30A46C" : "#E5484D"}`,
+              color: "#fff", fontSize: 14, lineHeight: 1.6, textAlign: "center",
+            }}>
+              <b>{wasRight ? "Correct!" : "Not quite."}</b>{" "}
+              {rollText}
+              {res.eff != null && res.eff !== 1 && !res.immune && (
+                <span> · {res.eff > 1 ? `${res.eff}× super effective` : `${res.eff}× resisted`}</span>
+              )}
+              {correct.length > 1 && !res.immune && (
+                <div style={{ fontSize: 12.5, marginTop: 3, opacity: .9 }}>
+                  the roll straddles two brackets — either was accepted
+                </div>
+              )}
+            </div>
+            <button onClick={next} style={{
+              width: "100%", padding: "14px", borderRadius: 12, border: "none",
+              background: "var(--gold)", color: "#1B1D36", cursor: "pointer",
+              fontFamily: "var(--display)", fontWeight: 800, fontSize: 20,
+              textTransform: "uppercase", letterSpacing: ".05em",
+            }}>
+              {wasRight && wins >= target ? "Finish 🏆" : "Next matchup →"}
+            </button>
+          </>
+        ) : (
+          <div style={{ textAlign: "center", color: "var(--muted)", fontSize: 12.5 }}>
+            {hard ? "Hard mode: real EVs, items & abilities in play" : "Base stats only"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DuelSummary({ result, onRestart, onAgain }) {
   const { target, attempts, bestStreak } = result;
   const acc = Math.round((target / attempts) * 100);
@@ -3674,9 +4924,14 @@ function SummaryScreen({ session, onRestart, onDrillToughest }) {
                   ? <TypeOrb types={monTypes(d.card.mon)} size={24} text={d.card.mon.name[0]} />
                   : d.card.nature
                     ? <NatureOrb nature={d.card.nature} size={24} />
-                    : <TypeOrb types={[d.card.type]} size={24} text={d.card.type[0].toUpperCase()} />}
+                    : d.card.type
+                      ? <TypeOrb types={[d.card.type]} size={24} text={d.card.type[0].toUpperCase()} />
+                      : <StatOrb statKey={d.card.statKey} size={24} />}
                 <span style={{ fontWeight: 600 }}>
-                  {d.card.mon ? d.card.mon.name : d.card.nature ? d.card.nature.name : cap(d.card.type)}
+                  {d.card.mon ? d.card.mon.name
+                    : d.card.nature ? d.card.nature.name
+                    : d.card.type ? cap(d.card.type)
+                    : STAT_LABEL[d.card.statKey]}
                 </span>
                 <span style={{ color: "var(--muted)", fontSize: 12 }}>
                   {d.card.cat === "stats"
@@ -3722,6 +4977,7 @@ function App() {
   const [queue, setQueue] = useState([]);
   const [result, setResult] = useState(null);
   const [sessionId, setSessionId] = useState(0);
+  const [team, setTeam] = useState(null);
 
   useEffect(() => {
     fetch("data.json")
@@ -3730,6 +4986,37 @@ function App() {
       .catch(() => {});
   }, []);
 
+  /* Persist the imported team where storage is available. The chat-artifact
+     sandbox blocks it, so every access is guarded and failure is a no-op. */
+  const TEAM_KEY = "vgcMetaBlitz.team";
+  const safeStore = {
+    get() { try { return window.localStorage.getItem(TEAM_KEY); } catch { return null; } },
+    set(v) { try { window.localStorage.setItem(TEAM_KEY, v); } catch { /* ignore */ } },
+    del() { try { window.localStorage.removeItem(TEAM_KEY); } catch { /* ignore */ } },
+  };
+
+  useEffect(() => {
+    const saved = safeStore.get();
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.mons && parsed.mons.length) setTeam(parsed);
+    } catch { /* corrupt payload — ignore */ }
+  }, []);
+
+  const importTeam = async (parsedSets) => {
+    const known = {};
+    (data.formats || []).forEach(f => Object.assign(known, f.moveData || {}));
+    const res = await hydrateTeam(parsedSets, known);
+    if (res.mons.length) {
+      const next = { mons: res.mons, moveData: res.moveData };
+      setTeam(next);
+      safeStore.set(JSON.stringify(next));
+    }
+    return res;
+  };
+  const clearTeam = () => { setTeam(null); safeStore.del(); };
+
   const start = (cfg) => {
     setSession(cfg);
     setResult(null);
@@ -3737,6 +5024,8 @@ function App() {
     if (cfg.type === "flash") {
       setQueue(buildDeck(cfg.deckCfg));
       setScreen("quiz");
+    } else if (cfg.type === "damage") {
+      setScreen("damage");
     } else {
       setScreen("duel");
     }
@@ -3782,6 +5071,9 @@ function App() {
           formats={data.formats}
           generated={data.generated}
           live={live}
+          team={team}
+          onImportTeam={importTeam}
+          onClearTeam={clearTeam}
           onStart={start}
         />
       )}
@@ -3826,6 +5118,17 @@ function App() {
             onDone={(res) => { setResult(res); setScreen("duelDone"); }}
           />
         )
+      )}
+      {screen === "damage" && session && (
+        <DamageScreen
+          key={sessionId}
+          pool={session.pool}
+          moveData={session.moveData}
+          target={session.dmgCfg.target}
+          hard={session.dmgCfg.hard}
+          onQuit={() => setScreen("config")}
+          onDone={(res) => { setResult(res); setScreen("duelDone"); }}
+        />
       )}
       {screen === "done" && result && (
         <SummaryScreen
