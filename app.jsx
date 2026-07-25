@@ -1078,11 +1078,12 @@ const FALLBACK = {
   }
  ]
 };
-const APP_VERSION = "v4 · 2026-07-10";
+const APP_VERSION = "v8 · 2026-07-25";
 
 const SRS = {
   GRADUATE_STEPS: 2,
-  GAPS: { again: 2, hard: 5, good: 10 },
+  MASTERY_TARGET: 2,   // correct answers needed to clear a card in mastery mode
+  GAPS: { again: 2, hard: 5, good: 10, easy: 14 },
   JITTER: 2,
 };
 const DUEL_TARGETS = [5, 10, 15, 25];
@@ -1225,6 +1226,16 @@ function evsPretty(evs) {
    when it's null the label gracefully shows the spread alone. */
 const buildLabel = (b) => (b.nature ? b.nature + " · " : "") + evsPretty(b.evs);
 
+/* Level-50 stat with 31 IVs; Champions EVs (0–32) are assumed to add stat
+   points directly. If in-game numbers differ, this is the one place to fix. */
+function realSpeedStat(base, ev) {
+  return Math.floor((2 * base + 31) / 2) + 5 + (ev || 0);
+}
+function speEV(build) {
+  const parts = String(build.evs || "").split("/").map(n => parseInt(n, 10));
+  return parts.length === 6 && !isNaN(parts[5]) ? parts[5] : 0;
+}
+
 /* Expand a ranked list with Mega Evolution forms (from mon.megas, enriched
    by the fetch script via PokéAPI). Megas inherit the base form's usage
    context, moves, items, and natures; stats, types, and ability are the
@@ -1298,8 +1309,8 @@ function speedContext(mon, pool) {
 
 /* --------------------------- deck building --------------------------- */
 
-function buildDeck({ mons, count, cat, statKey, doShuffle, abilSkipMono }) {
-  const pool = mons.slice(0, count);
+function buildDeck({ mons, count, skip, cat, statKey, doShuffle, abilSkipMono }) {
+  const pool = mons.slice(skip || 0, count);
   const cards = [];
 
   pool.forEach((mon) => {
@@ -1316,7 +1327,7 @@ function buildDeck({ mons, count, cat, statKey, doShuffle, abilSkipMono }) {
           target: list.filter(e => e.pct != null && e.pct > 30).map(e => e.name),
         });
       }
-    } else if (cat === "items") {
+    } else if (cat === "items" && !isMegaEntry(mon)) {
       const own = (mon.items || []).map(norm);
       if (own.some(e => e.pct != null)) {
         const ownNames = new Set(own.map(e => e.name));
@@ -1324,6 +1335,7 @@ function buildDeck({ mons, count, cat, statKey, doShuffle, abilSkipMono }) {
           pool.filter(m => m.name !== mon.name)
             .flatMap(m => (m.items || []).map(norm).map(e => e.name))
             .filter(n => !ownNames.has(n))
+            .filter(n => !(MEGA_STONE.test(n) && n !== "Eviolite"))
         )]);
         const entries = own.slice(0, 8).map(e => ({ ...e }));
         while (entries.length < 8 && distractors.length) {
@@ -1386,7 +1398,7 @@ function buildDeck({ mons, count, cat, statKey, doShuffle, abilSkipMono }) {
   const deck = doShuffle ? shuffle(cards) : cards;
   return deck.map((c, i) => ({
     id: `${c.mon ? c.mon.name : c.nature ? c.nature.name : c.type}|${c.cat}|${i}`,
-    card: c, step: 0, lapses: 0, reviews: 0,
+    card: c, step: 0, lapses: 0, reviews: 0, correct: 0,
   }));
 }
 
@@ -1562,17 +1574,23 @@ function ConfigScreen({ formats, generated, live, onStart }) {
   const [profileKey, setProfileKey] = useState("offense");
   const [abilSkipMono, setAbilSkipMono] = useState(true);
   const [count, setCount] = useState(20);
+  const [mastery, setMastery] = useState(false);
+  const [useSkip, setUseSkip] = useState(false);
+  const [skipTop, setSkipTop] = useState(0);
   const [megaMode, setMegaMode] = useState("include"); // include | exclude | only
   // speed matchups options
   const [duelVariant, setDuelVariant] = useState("faster");
   const [duelTarget, setDuelTarget] = useState(10);
   const [duelHard, setDuelHard] = useState(false);
-  const [duelNatures, setDuelNatures] = useState(false);
+  const [duelBuild, setDuelBuild] = useState("none");
 
   const availableMons = expandPool(reg.mons, megaMode);
   const maxMons = availableMons.length;
   const effCount = Math.max(1, Math.min(count, maxMons));
-  const pool = availableMons.slice(0, effCount);
+  // Studying a chunk: skip the top N already-known threats. Clamped so the
+  // range always keeps at least one Pokémon in it.
+  const effSkip = useSkip ? Math.max(0, Math.min(skipTop, effCount - 1)) : 0;
+  const pool = availableMons.slice(effSkip, effCount);
 
   const catAvailable = (key) => {
     if (!pool.length) return false;
@@ -1588,9 +1606,10 @@ function ConfigScreen({ formats, generated, live, onStart }) {
   };
 
   const duelPool = pool.filter(m => m.stats);
+  const realAvailable = duelPool.some(m => m.builds && m.builds.length);
   const effCat = cat === "typematch" ? typeMatchKey : cat === "profile" ? profileKey : cat;
   const deckPreview = cat !== "speed" && catAvailable(cat)
-    ? buildDeck({ mons: availableMons, count: effCount, cat: effCat, statKey, doShuffle: false, abilSkipMono })
+    ? buildDeck({ mons: availableMons, count: effCount, skip: effSkip, cat: effCat, statKey, doShuffle: false, abilSkipMono })
     : [];
   const canStart = cat === "speed"
     ? duelPool.length >= (duelVariant === "faster" ? 2 : 4)
@@ -1664,11 +1683,11 @@ function ConfigScreen({ formats, generated, live, onStart }) {
       {/* pool */}
       <section style={panelStyle}>
         <div style={panelHeadStyle}>
-          <span>Top Pokémon to study</span>
+          <span>{effSkip ? "Usage ranks to study" : "Top Pokémon to study"}</span>
           <span style={{
-            fontFamily: "var(--display)", fontWeight: 800, fontSize: 30,
+            fontFamily: "var(--display)", fontWeight: 800, fontSize: effSkip ? 26 : 30,
             color: "var(--gold)", lineHeight: 1,
-          }}>{maxMons ? effCount : 0}</span>
+          }}>{maxMons ? (effSkip ? `${effSkip + 1}–${effCount}` : effCount) : 0}</span>
         </div>
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
           {[
@@ -1687,19 +1706,68 @@ function ConfigScreen({ formats, generated, live, onStart }) {
           </div>
         ) : (
           <>
+            <div style={{
+              display: "flex", justifyContent: "space-between",
+              fontFamily: "var(--mono)", fontSize: 10.5, color: "rgba(255,255,255,.4)",
+              letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 2,
+            }}>
+              <span>Down to rank</span>
+              <span>{effCount}</span>
+            </div>
             <input
               type="range" min={Math.min(5, maxMons)} max={maxMons} step={1} value={effCount}
               onChange={e => setCount(Number(e.target.value))}
               style={{ width: "100%", accentColor: "#FFCB05" }}
-              aria-label="Number of top Pokémon to study"
+              aria-label="Study down to this usage rank"
             />
+
+            <label
+              style={{
+                display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+                color: "#fff", fontSize: 13, marginTop: 10,
+              }}
+              onClick={() => setUseSkip(v => !v)}
+            >
+              <span style={{
+                width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                border: `2px solid ${useSkip ? "var(--gold)" : "rgba(255,255,255,.35)"}`,
+                background: useSkip ? "var(--gold)" : "transparent",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#1B1D36", fontSize: 10, fontWeight: 900,
+              }}>{useSkip ? "✓" : ""}</span>
+              Omit top threats
+            </label>
+
+            {useSkip && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{
+                  display: "flex", justifyContent: "space-between",
+                  fontFamily: "var(--mono)", fontSize: 10.5, color: "rgba(255,255,255,.4)",
+                  letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 2,
+                }}>
+                  <span>Skip the top</span>
+                  <span>{effSkip}</span>
+                </div>
+                <input
+                  type="range" min={0} max={Math.max(0, effCount - 1)} step={1} value={effSkip}
+                  onChange={e => setSkipTop(Number(e.target.value))}
+                  style={{ width: "100%", accentColor: "#E8913A" }}
+                  aria-label="Number of top-ranked Pokémon to skip"
+                />
+              </div>
+            )}
+
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 12 }}>
               {pool.map(m => (
                 <TypeOrb key={m.name} types={monTypes(m)} size={26} text={m.name[0]} />
               ))}
             </div>
             <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 8 }}>
-              Top {effCount} by usage{megaMode !== "include" ? ` (${megaMode === "only" ? "Mega users only" : "Megas excluded"})` : ""} · last is {pool[pool.length - 1].name}
+              {effSkip
+                ? `Ranks ${effSkip + 1}–${effCount} · ${pool.length} Pokémon`
+                : `Top ${effCount} by usage`}
+              {megaMode !== "include" ? ` (${megaMode === "only" ? "Mega users only" : "Megas excluded"})` : ""}
+              {effSkip ? ` · ${pool[0].name} → ${pool[pool.length - 1].name}` : ` · last is ${pool[pool.length - 1].name}`}
             </div>
           </>
         )}
@@ -1835,27 +1903,46 @@ function ConfigScreen({ formats, generated, live, onStart }) {
                             display: "flex", alignItems: "center", justifyContent: "center",
                             color: "#fff", fontSize: 10, fontWeight: 900,
                           }}>{duelHard ? "✓" : ""}</span>
-                          🔥 {duelVariant === "scarf" ? "More effects" : "Hard mode"}
+                          🔥 Hard mode
                           <span style={{ color: "var(--muted)", fontSize: 11, marginLeft: "auto" }}>
                             {duelVariant === "scarf" ? "Tailwind · PAR · weather · TR" : "Scarf · Tailwind · PAR · weather · TR"}
                           </span>
                         </label>
-                        {duelHard && (
-                          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 13.5, cursor: "pointer", paddingLeft: 24 }}
-                            onClick={() => setDuelNatures(v => !v)}>
-                            <span style={{
-                              width: 16, height: 16, borderRadius: 4,
-                              border: `2px solid ${duelNatures ? "var(--gold)" : "rgba(255,255,255,.35)"}`,
-                              background: duelNatures ? "var(--gold)" : "transparent",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              color: "#1B1D36", fontSize: 10, fontWeight: 900,
-                            }}>{duelNatures ? "✓" : ""}</span>
-                            ± Speed natures
-                            <span style={{ color: "var(--muted)", fontSize: 11, marginLeft: "auto" }}>
-                              ×1.1 / ×0.9
-                            </span>
-                          </label>
-                        )}
+                        <div style={{ marginTop: 4 }}>
+                          <div style={{
+                            fontFamily: "var(--mono)", fontSize: 11, letterSpacing: ".12em",
+                            textTransform: "uppercase", color: "rgba(255,255,255,.5)", marginBottom: 6,
+                          }}>Speed math</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            <SubPill small active={duelBuild === "none"} onClick={() => setDuelBuild("none")}>
+                              Base stats
+                            </SubPill>
+                            <SubPill small active={duelBuild === "natures"} onClick={() => setDuelBuild("natures")}>
+                              ± Spe natures
+                            </SubPill>
+                            {realAvailable ? (
+                              <SubPill small active={duelBuild === "real"} onClick={() => setDuelBuild("real")}>
+                                Real builds
+                              </SubPill>
+                            ) : (
+                              <span style={{
+                                opacity: .45, border: "1px solid rgba(255,255,255,.15)", borderRadius: 999,
+                                padding: "4px 10px", fontSize: 12, color: "rgba(255,255,255,.75)",
+                              }}>Real builds</span>
+                            )}
+                          </div>
+                          <div style={{ color: "var(--muted)", fontSize: 11.5, marginTop: 6, lineHeight: 1.5 }}>
+                            {duelBuild === "real"
+                              ? (duelVariant === "order"
+                                ? "L50 speed from each mon's top EV spread + a random real held item (over 10% usage). Real natures join automatically once the data source is fixed."
+                                : "L50 speed from each mon's top EV spread — the hidden Scarf stays the puzzle.")
+                              : duelBuild === "natures"
+                                ? "Random ×1.1 / ×0.9 speed natures dealt each round."
+                                : realAvailable
+                                  ? "Plain base-stat speeds."
+                                  : "Real builds unlocks after the first data pull."}
+                          </div>
+                        </div>
                       </div>
                     )}
                     <div>
@@ -1883,11 +1970,26 @@ function ConfigScreen({ formats, generated, live, onStart }) {
         </div>
       </section>
 
+      {cat !== "speed" && (
+        <section style={panelStyle}>
+          <div style={panelHeadStyle}><span>Session goal</span></div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <SubPill active={!mastery} onClick={() => setMastery(false)}>Standard</SubPill>
+            <SubPill active={mastery} onClick={() => setMastery(true)}>Mastery</SubPill>
+          </div>
+          <div style={{ color: "var(--muted)", fontSize: 11.5, marginTop: 8, lineHeight: 1.5 }}>
+            {mastery
+              ? `Every card must be answered correctly ${SRS.MASTERY_TARGET} times before it clears. A miss resets that card's count to zero.`
+              : "Cards clear on graduation — two Goods or one Easy, and auto-graded quizzes clear on a single correct answer."}
+          </div>
+        </section>
+      )}
+
       <button
         disabled={!canStart}
         onClick={() => onStart(cat === "speed"
-          ? { type: "duel", reg, pool: duelPool, duelCfg: { target: duelTarget, variant: duelVariant, hard: duelHard, natures: duelHard && duelNatures } }
-          : { type: "flash", reg, pool, deckCfg: { mons: availableMons, count: effCount, cat: effCat, statKey, doShuffle: true, abilSkipMono } }
+          ? { type: "duel", reg, pool: duelPool, duelCfg: { target: duelTarget, variant: duelVariant, hard: duelHard, buildStyle: duelBuild } }
+          : { type: "flash", reg, pool, deckCfg: { mons: availableMons, count: effCount, skip: effSkip, cat: effCat, statKey, doShuffle: true, abilSkipMono }, mastery }
         )}
         style={{
           width: "100%", marginTop: 6, padding: "16px", borderRadius: 12, border: "none",
@@ -1907,8 +2009,10 @@ function ConfigScreen({ formats, generated, live, onStart }) {
       }}>
         {reg.source}. Data as of {generated}
         {live ? " (auto-refreshed nightly)" : " (bundled snapshot — deploy for nightly refresh)"}.
-        {" "}Artwork from PokéAPI. Flip cards use Again/Hard/Good/Easy grading (two Goods or one Easy clears a
-        card); checkable quizzes grade themselves — correct clears the card, a miss requeues it.
+        {" "}Artwork from PokéAPI. Flip cards use Again/Hard/Good/Easy grading; checkable quizzes grade themselves.
+        In Standard, two Goods or one Easy clears a card and a correct quiz answer clears it
+        outright; in Mastery, every card needs {SRS.MASTERY_TARGET} correct answers and a miss
+        resets its count.
       </p>
     </div>
   );
@@ -2187,7 +2291,7 @@ const GRADES = [
   { key: "easy", label: "Easy", color: "#4A8FE7" },
 ];
 
-function QuizScreen({ initialQueue, pool, reg, onDone, onQuit }) {
+function QuizScreen({ initialQueue, pool, reg, mastery, onDone, onQuit }) {
   const total = initialQueue.length;
   const [queue, setQueue] = useState(initialQueue);
   const [doneCards, setDoneCards] = useState([]);
@@ -2200,6 +2304,16 @@ function QuizScreen({ initialQueue, pool, reg, onDone, onQuit }) {
 
   const gradeHint = (g) => {
     if (!item) return "";
+    if (mastery) {
+      if (g === "easy" || g === "good") {
+        const nextCorrect = (item.correct || 0) + 1;
+        return nextCorrect >= SRS.MASTERY_TARGET
+          ? "mastered ✓"
+          : `${SRS.MASTERY_TARGET - nextCorrect} more correct`;
+      }
+      if (g === "hard") return "no credit";
+      return "resets to 0";
+    }
     if (g === "easy") return "done ✓";
     if (g === "good") return item.step + 1 >= SRS.GRADUATE_STEPS ? "done ✓" : `~${SRS.GAPS.good} cards`;
     if (g === "hard") return `~${SRS.GAPS.hard} cards`;
@@ -2210,10 +2324,24 @@ function QuizScreen({ initialQueue, pool, reg, onDone, onQuit }) {
     if (!item) return;
     const nextLog = { ...log, [g]: log[g] + 1 };
     const rest = queue.slice(1);
-    const updated = { ...item, reviews: item.reviews + 1 };
+    const updated = { ...item, reviews: item.reviews + 1, correct: item.correct || 0 };
 
     let graduated = false;
-    if (g === "easy") graduated = true;
+    if (mastery) {
+      // Mastery: a card clears only after MASTERY_TARGET correct answers.
+      // Hard is a pass but earns no credit; Again wipes the count.
+      if (g === "easy" || g === "good") {
+        updated.correct = (item.correct || 0) + 1;
+        updated.step = updated.correct;
+        graduated = updated.correct >= SRS.MASTERY_TARGET;
+      } else if (g === "hard") {
+        updated.step = item.step;
+      } else {
+        updated.correct = 0;
+        updated.step = 0;
+        updated.lapses = item.lapses + 1;
+      }
+    } else if (g === "easy") graduated = true;
     else if (g === "good") {
       updated.step = item.step + 1;
       graduated = updated.step >= SRS.GRADUATE_STEPS;
@@ -2226,7 +2354,7 @@ function QuizScreen({ initialQueue, pool, reg, onDone, onQuit }) {
 
     if (graduated) {
       const nextDone = [...doneCards, updated];
-      if (rest.length === 0) { onDone({ done: nextDone, log: nextLog, total }); return; }
+      if (rest.length === 0) { onDone({ done: nextDone, log: nextLog, total, mastery }); return; }
       setDoneCards(nextDone);
       setQueue(rest);
     } else {
@@ -2274,9 +2402,13 @@ function QuizScreen({ initialQueue, pool, reg, onDone, onQuit }) {
 
   const stateChip = item.reviews === 0
     ? { text: "new", color: "#4A8FE7" }
-    : item.lapses > 0 && item.step === 0
-      ? { text: "relearning", color: "#E5484D" }
-      : { text: `learning ${item.step}/${SRS.GRADUATE_STEPS}`, color: "#E8913A" };
+    : mastery
+      ? (item.lapses > 0 && (item.correct || 0) === 0
+        ? { text: `relearning · 0/${SRS.MASTERY_TARGET}`, color: "#E5484D" }
+        : { text: `${item.correct || 0}/${SRS.MASTERY_TARGET} correct`, color: "#E8913A" })
+      : item.lapses > 0 && item.step === 0
+        ? { text: "relearning", color: "#E5484D" }
+        : { text: `learning ${item.step}/${SRS.GRADUATE_STEPS}`, color: "#E8913A" };
 
   const togglePick = (name) => {
     if (flipped) return;
@@ -2452,7 +2584,13 @@ function QuizScreen({ initialQueue, pool, reg, onDone, onQuit }) {
               letterSpacing: ".05em", textTransform: "uppercase", lineHeight: 1,
             }}>Next →</span>
             <span style={{ fontSize: 10.5, opacity: .9, fontFamily: "var(--mono)" }}>
-              {wasRight ? "correct — card cleared ✓" : "you'll see this one again soon"}
+              {wasRight
+                ? (mastery
+                  ? ((item.correct || 0) + 1 >= SRS.MASTERY_TARGET
+                    ? "correct — mastered ✓"
+                    : `correct — ${(item.correct || 0) + 1} of ${SRS.MASTERY_TARGET}`)
+                  : "correct — card cleared ✓")
+                : (mastery ? "miss — count resets to 0" : "you'll see this one again soon")}
             </span>
           </button>
         ) : isSelectCat ? (
@@ -2746,14 +2884,58 @@ function DuelScreen({ pool, target, onDone, onQuit }) {
 
 /* ----------------------------- turn order (2v2) ----------------------------- */
 
-function buildRound(pool, prevKey, hard, useNatures) {
+/* buildStyle: "none" (base stats), "natures" (random ±Spe natures dealt), or
+   "real" (each mon's top EV spread; its real nature once the data source is
+   fixed; and — in the turn-order game — a random real held item drawn from
+   its over-10%-usage items; Megas only ever hold their Mega Stone). */
+function applyBuildStyle(mons, mods, buildStyle, withItems) {
+  if (buildStyle === "natures") {
+    mons.forEach(m => {
+      const r = Math.random();
+      if (r < 0.35) {
+        mods.natures[m.name] = NATURE_PLUS_SPE[Math.floor(Math.random() * NATURE_PLUS_SPE.length)];
+      } else if (r < 0.7) {
+        mods.natures[m.name] = NATURE_MINUS_SPE[Math.floor(Math.random() * NATURE_MINUS_SPE.length)];
+      }
+    });
+  }
+  if (buildStyle === "real") {
+    mods.realBase = {};
+    mods.realItems = withItems ? {} : null;
+    mons.forEach(m => {
+      const b = (m.builds || [])[0];
+      const ev = b ? speEV(b) : 0;
+      mods.realBase[m.name] = { stat: realSpeedStat(m.stats.spe, ev), ev };
+      if (b && b.nature && natureSpeedMult(b.nature) !== 1) mods.natures[m.name] = b.nature;
+      if (!withItems) return;
+      if (isMegaEntry(m)) {
+        const stone = (m.items || []).map(norm).map(e => e.name)
+          .find(n => MEGA_STONE.test(n) && n !== "Eviolite");
+        if (stone) mods.realItems[m.name] = stone;
+        return;
+      }
+      const opts = (m.items || []).map(norm).filter(e => e.pct != null && e.pct > 10).map(e => e.name);
+      if (!opts.length) return;
+      const pick = opts[Math.floor(Math.random() * opts.length)];
+      mods.realItems[m.name] = pick;
+      if (pick === "Choice Scarf") mods.scarf.push(m.name);
+      if (pick === "Iron Ball") mods.ironBall.push(m.name);
+    });
+  }
+}
+
+function buildRound(pool, prevKey, hard, buildStyle) {
   let mons = pool.slice(0, 4), key = null;
   for (let tries = 0; tries < 30; tries++) {
     mons = shuffle(pool).slice(0, 4);
     key = mons.map(m => m.name).sort().join("|");
     if (key !== prevKey || tries >= 25) break;
   }
-  const mods = { weather: null, weatherSetBy: null, trickRoom: false, tailwindSide: null, scarf: [], para: [], natures: {} };
+  const mods = {
+    weather: null, weatherSetBy: null, trickRoom: false, tailwindSide: null,
+    scarf: [], para: [], natures: {}, realBase: null, realItems: null, ironBall: [],
+  };
+  applyBuildStyle(mons, mods, buildStyle, true);
   if (hard) {
     const setters = [];
     mons.forEach(m => {
@@ -2780,26 +2962,17 @@ function buildRound(pool, prevKey, hard, useNatures) {
     }
     if (Math.random() < 0.3) mods.tailwindSide = Math.random() < 0.5 ? 0 : 1;
     if (Math.random() < 0.18) mods.trickRoom = true;
-    mons.forEach(m => {
-      if (mods.scarf.length < 2 && Math.random() < 0.15) mods.scarf.push(m.name);
-    });
+    if (buildStyle !== "real") {
+      mons.forEach(m => {
+        if (mods.scarf.length < 2 && Math.random() < 0.15) mods.scarf.push(m.name);
+      });
+    }
     const paraPool = mons.filter(m => !mods.scarf.includes(m.name));
     if (Math.random() < 0.25 && paraPool.length) {
       mods.para.push(paraPool[Math.floor(Math.random() * paraPool.length)].name);
     }
-    if (useNatures) {
-      // Speed-relevant natures only: every chip on the field changes the math.
-      mons.forEach(m => {
-        const r = Math.random();
-        if (r < 0.35) {
-          mods.natures[m.name] = NATURE_PLUS_SPE[Math.floor(Math.random() * NATURE_PLUS_SPE.length)];
-        } else if (r < 0.7) {
-          mods.natures[m.name] = NATURE_MINUS_SPE[Math.floor(Math.random() * NATURE_MINUS_SPE.length)];
-        }
-      });
-    }
     const weatherMatters = mods.weather && mons.some(m => boostAbility(m, mods.weather));
-    if (!mods.trickRoom && mods.tailwindSide === null &&
+    if (buildStyle !== "real" && !mods.trickRoom && mods.tailwindSide === null &&
         !mods.scarf.length && !mods.para.length && !weatherMatters &&
         !Object.keys(mods.natures).length) {
       mods.scarf.push(mons[Math.floor(Math.random() * 4)].name);
@@ -2808,9 +2981,11 @@ function buildRound(pool, prevKey, hard, useNatures) {
   return { mons, key, mods };
 }
 
-/* Effective speed: nature first, then ×1.5 Scarf ×2 Tailwind ×2 weather ability ×0.5 PAR. */
+/* Effective speed: real-build L50 stat (when present) or base Speed, then
+   nature, ×1.5 Scarf, ×0.5 Iron Ball, ×2 Tailwind, ×2 weather ability, ×0.5 PAR. */
 function effSpeed(mon, side, mods) {
-  let s = mon.stats.spe;
+  const rb = mods.realBase && mods.realBase[mon.name];
+  let s = rb ? rb.stat : mon.stats.spe;
   const parts = [];
   const nat = mods.natures && mods.natures[mon.name];
   const natMult = nat ? natureSpeedMult(nat) : 1;
@@ -2819,11 +2994,13 @@ function effSpeed(mon, side, mods) {
     parts.push(`×${natMult} ${nat}`);
   }
   if (mods.scarf.includes(mon.name)) { s *= 1.5; parts.push("×1.5 Scarf"); }
+  if (mods.ironBall && mods.ironBall.includes(mon.name)) { s *= 0.5; parts.push("×0.5 Iron Ball"); }
   if (mods.tailwindSide === side) { s *= 2; parts.push("×2 Tailwind"); }
   const wAb = boostAbility(mon, mods.weather);
   if (wAb) { s *= 2; parts.push("×2 " + wAb); }
   if (mods.para.includes(mon.name)) { s *= 0.5; parts.push("×0.5 PAR"); }
-  return { value: Math.floor(s), breakdown: parts.length ? mon.stats.spe + " " + parts.join(" ") : null };
+  const baseLabel = rb ? `${rb.stat} (L50 · ${rb.ev} Spe EV)` : String(mon.stats.spe);
+  return { value: Math.floor(s), breakdown: (parts.length || rb) ? [baseLabel, ...parts].join(" ") : null };
 }
 
 function ModChip({ text, bg, fg }) {
@@ -2836,8 +3013,8 @@ function ModChip({ text, bg, fg }) {
   );
 }
 
-function TurnOrderScreen({ pool, target, hard, natures, onDone, onQuit }) {
-  const [round, setRound] = useState(() => buildRound(pool, null, hard, natures));
+function TurnOrderScreen({ pool, target, hard, buildStyle, onDone, onQuit }) {
+  const [round, setRound] = useState(() => buildRound(pool, null, hard, buildStyle));
   const [order, setOrder] = useState([]);
   const [wins, setWins] = useState(0);
   const [attempts, setAttempts] = useState(0);
@@ -2878,7 +3055,7 @@ function TurnOrderScreen({ pool, target, hard, natures, onDone, onQuit }) {
   const nextRound = () => {
     if (wasRight && wins >= target) { onDone({ target, attempts, bestStreak }); return; }
     setOrder([]);
-    setRound(buildRound(pool, round.key, hard, natures));
+    setRound(buildRound(pool, round.key, hard, buildStyle));
   };
 
   const sorted = [...mons].sort((a, b) =>
@@ -2922,6 +3099,10 @@ function TurnOrderScreen({ pool, target, hard, natures, onDone, onQuit }) {
       const m = natureSpeedMult(nat);
       chips.push(<ModChip key="n" text={nat}
         bg={m > 1 ? "#30A46C" : m < 1 ? "#6F35FC" : "#8A8DA8"} />);
+    }
+    const realIt = mods.realItems && mods.realItems[mon.name];
+    if (realIt && realIt !== "Choice Scarf") {
+      chips.push(<ModChip key="ri" text={realIt} bg="#4A6FA5" />);
     }
     const border = !answered
       ? (pos !== -1 ? "var(--gold)" : "rgba(255,255,255,.14)")
@@ -3081,14 +3262,20 @@ function TurnOrderScreen({ pool, target, hard, natures, onDone, onQuit }) {
    is shown; the player must deduce the holder. Rounds are regenerated
    until the puzzle has a unique answer: no other Pokémon could hold the
    Scarf and produce the same observed order. */
-function buildScarfRound(pool, prevKey, hard, useNatures) {
+function buildScarfRound(pool, prevKey, hard, buildStyle) {
   let best = null;
   for (let attempt = 0; attempt < 40; attempt++) {
     const mons = shuffle(pool).slice(0, 4);
     const key = mons.map(m => m.name).sort().join("|");
     if (key === prevKey && attempt < 30) continue;
 
-    const mods = { weather: null, weatherSetBy: null, trickRoom: false, tailwindSide: null, scarf: [], para: [], natures: {} };
+    const mods = {
+      weather: null, weatherSetBy: null, trickRoom: false, tailwindSide: null,
+      scarf: [], para: [], natures: {}, realBase: null, realItems: null, ironBall: [],
+    };
+    // Spreads (and real natures, once fixed) apply here too — but no visible
+    // items: the hidden Choice Scarf IS the puzzle.
+    applyBuildStyle(mons, mods, buildStyle, false);
     if (hard) {
       const setters = [];
       mons.forEach(m => {
@@ -3109,16 +3296,6 @@ function buildScarfRound(pool, prevKey, hard, useNatures) {
       if (Math.random() < 0.3) mods.tailwindSide = Math.random() < 0.5 ? 0 : 1;
       if (Math.random() < 0.18) mods.trickRoom = true;
       if (Math.random() < 0.25) mods.para.push(mons[Math.floor(Math.random() * 4)].name);
-      if (useNatures) {
-        mons.forEach(m => {
-          const r = Math.random();
-          if (r < 0.35) {
-            mods.natures[m.name] = NATURE_PLUS_SPE[Math.floor(Math.random() * NATURE_PLUS_SPE.length)];
-          } else if (r < 0.7) {
-            mods.natures[m.name] = NATURE_MINUS_SPE[Math.floor(Math.random() * NATURE_MINUS_SPE.length)];
-          }
-        });
-      }
     }
 
     const holder = mons[Math.floor(Math.random() * 4)].name;
@@ -3145,8 +3322,8 @@ function buildScarfRound(pool, prevKey, hard, useNatures) {
 
 const ORDINALS = ["1st", "2nd", "3rd", "4th"];
 
-function ScarfHuntScreen({ pool, target, hard, natures, onDone, onQuit }) {
-  const [round, setRound] = useState(() => buildScarfRound(pool, null, hard, natures));
+function ScarfHuntScreen({ pool, target, hard, buildStyle, onDone, onQuit }) {
+  const [round, setRound] = useState(() => buildScarfRound(pool, null, hard, buildStyle));
   const [picked, setPicked] = useState(null);
   const [wins, setWins] = useState(0);
   const [attempts, setAttempts] = useState(0);
@@ -3187,7 +3364,7 @@ function ScarfHuntScreen({ pool, target, hard, natures, onDone, onQuit }) {
     if (wasRight && wins >= target) { onDone({ target, attempts, bestStreak }); return; }
     setPicked(null);
     setHover(null);
-    setRound(buildScarfRound(pool, round.key, hard, natures));
+    setRound(buildScarfRound(pool, round.key, hard, buildStyle));
   };
 
   const hitTest = (x, y) => {
@@ -3459,22 +3636,25 @@ function DuelSummary({ result, onRestart, onAgain }) {
 /* ----------------------------- summary ----------------------------- */
 
 function SummaryScreen({ session, onRestart, onDrillToughest }) {
-  const { done, log, total } = session;
+  const { done, log, total, mastery } = session;
   const reviews = log.again + log.hard + log.good + log.easy;
   const tough = done.filter(d => d.lapses > 0).sort((a, b) => b.lapses - a.lapses);
-  const firstTry = done.filter(d => d.lapses === 0 && d.reviews <= SRS.GRADUATE_STEPS).length;
+  const target = mastery ? SRS.MASTERY_TARGET : SRS.GRADUATE_STEPS;
+  const firstTry = done.filter(d => d.lapses === 0 && d.reviews <= target).length;
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", padding: "40px 18px" }}>
       <div style={{
         fontFamily: "var(--mono)", fontSize: 12, letterSpacing: ".14em",
         textTransform: "uppercase", color: "var(--gold)", marginBottom: 8,
-      }}>Session complete — all cards cleared</div>
+      }}>{mastery
+        ? `Mastery complete — every card correct ${SRS.MASTERY_TARGET}×`
+        : "Session complete — all cards cleared"}</div>
       <div style={{ fontFamily: "var(--display)", fontWeight: 800, fontSize: 72, color: "#fff", lineHeight: 1 }}>
         {reviews}<span style={{ fontSize: 30, color: "var(--muted)" }}> reviews</span>
       </div>
       <p style={{ color: "var(--muted)", fontSize: 15, margin: "10px 0 24px", lineHeight: 1.6 }}>
-        {total} cards learned · {firstTry} cleared without a miss.
+        {total} cards {mastery ? "mastered" : "learned"} · {firstTry} cleared without a miss.
         <br />
         <span style={{ fontFamily: "var(--mono)", fontSize: 13 }}>
           <span style={{ color: "#E5484D" }}>{log.again} again</span> ·{" "}
@@ -3563,7 +3743,7 @@ function App() {
   };
 
   const drillToughest = (tough) => {
-    setQueue(shuffle(tough.map(t => ({ ...t, step: 0, lapses: 0, reviews: 0 }))));
+    setQueue(shuffle(tough.map(t => ({ ...t, step: 0, lapses: 0, reviews: 0, correct: 0 }))));
     setResult(null);
     setSessionId(s => s + 1);
     setScreen("quiz");
@@ -3611,6 +3791,7 @@ function App() {
           initialQueue={queue}
           pool={session.pool}
           reg={session.reg}
+          mastery={!!session.mastery}
           onQuit={() => setScreen("config")}
           onDone={(res) => { setResult(res); setScreen("done"); }}
         />
@@ -3622,7 +3803,7 @@ function App() {
             pool={session.pool}
             target={session.duelCfg.target}
             hard={session.duelCfg.hard}
-            natures={session.duelCfg.natures}
+            buildStyle={session.duelCfg.buildStyle}
             onQuit={() => setScreen("config")}
             onDone={(res) => { setResult(res); setScreen("duelDone"); }}
           />
@@ -3632,7 +3813,7 @@ function App() {
             pool={session.pool}
             target={session.duelCfg.target}
             hard={session.duelCfg.hard}
-            natures={session.duelCfg.natures}
+            buildStyle={session.duelCfg.buildStyle}
             onQuit={() => setScreen("config")}
             onDone={(res) => { setResult(res); setScreen("duelDone"); }}
           />

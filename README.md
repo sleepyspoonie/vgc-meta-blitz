@@ -40,16 +40,22 @@ refresh. The run only fails outright if nothing could be refreshed.
 
 ## What to drill
 
-All drills share the pool config: regulation, top-N slider, and a
+All drills share the pool config: regulation, a usage-rank range, and a
 **Mega selector** (Include Megas / No Megas / Megas only, detected from
 Mega Stones in the item data).
+
+The rank range is two sliders: the first sets how far down the usage list
+to study, and an optional **Skip top threats I've already studied** toggle
+adds a second slider that trims from the top. Together they let you chunk
+the ladder — study ranks 1–25 this week, then flip to 26–50 without
+re-drilling what you know.
 
 | Drill | How it plays |
 |-------|--------------|
 | Base Stat Quiz | Flip cards for one stat (default Speed, with speed-tier context on reveal) |
-| Speed Tier Simulator | 1v1 duels, 2v2 turn order, or Find the Scarf (the move order is shown — drag the Scarf onto the hidden holder; rounds regenerate until the answer is unique). Win targets, streaks, and an optional Hard Mode (Scarf ×1.5, Tailwind ×2, PAR ×0.5, weather + Swift Swim/Chlorophyll/Sand Rush/Slush Rush ×2, Trick Room reversal, optional ±Spe natures). Weather setters put their weather up 50% of the time. |
+| Speed Tier Simulator | 1v1 duels, 2v2 turn order, or Find the Scarf (the move order is shown — drag the Scarf onto the hidden holder; rounds regenerate until the answer is unique). A three-way Speed Math selector applies to turn order and scarf hunt: Base stats, ± Spe natures (random ×1.1/×0.9 dealt each round), or Real builds (L50 speed from each mon's top EV spread — assumed formula ⌊(2×base+31)/2⌋+5+EV — plus, in turn order, a random real held item from its >10%-usage items shown as a chip; Choice Scarf ×1.5 and Iron Ball ×0.5 affect the math, Megas only ever hold their stone, and real natures slot in automatically once the data source is fixed). Win targets, streaks, and an optional Hard Mode (Scarf ×1.5, Tailwind ×2, PAR ×0.5, weather + Swift Swim/Chlorophyll/Sand Rush/Slush Rush ×2, Trick Room reversal, optional ±Spe natures). Weather setters put their weather up 50% of the time. |
 | Common Movesets Quiz | The mon's tracked moves, shuffled — select every move over 30% usage |
-| Common Items Quiz | 8 items (the mon's own + distractors from other mons) — select everything over 10% usage |
+| Common Items Quiz | 8 items (the mon's own + distractors from other mons) — select everything over 10% usage. Mega form entries are excluded (they can only hold their stone), and Mega Stones never appear as distractors |
 | Common Builds Quiz | Multiple choice — pick the mon's real most-common build (nature + EV spread) among builds borrowed from other meta mons. While Pikalytics' nature field is blank (reported bug), options show the EV spread alone and natures slot in automatically once fixed |
 | Preferred Abilities Quiz | Multiple choice — pick the mon's most common ability. Reveals a description of the ability (from PokéAPI). Pokémon with only one tracked ability are skipped by default (toggleable) |
 | Preferred Natures Quiz | Flip cards from ladder data |
@@ -68,6 +74,22 @@ Megas), hides them (No Megas), or drills only them (Megas only).
 
 Games that need usage percentages (moves, items) stay locked until the
 first data pull populates them.
+
+## Session goal: Standard vs Mastery
+
+Every drill runs in one of two completion modes:
+
+- **Standard** — a card clears on graduation: two Goods or one Easy on flip
+  cards, or a single correct answer on an auto-graded quiz.
+- **Mastery** — a card clears only after **2 correct answers**. A miss
+  resets that card's count to zero, so finishing a session means you got
+  every card right twice since your last mistake. Correct answers are
+  spaced ~10–14 cards apart, so the second one tests recall rather than
+  short-term memory. On flip cards, Hard counts as a pass but earns no
+  mastery credit.
+
+The card's status chip shows live progress (`1/2 correct`), and
+`SRS.MASTERY_TARGET` at the top of `app.jsx` changes the requirement.
 
 ## Spaced repetition (flip cards)
 
