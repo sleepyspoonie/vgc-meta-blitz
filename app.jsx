@@ -1265,7 +1265,7 @@ const FALLBACK = {
   }
  ]
 };
-const APP_VERSION = "v13 · 2026-07-25";
+const APP_VERSION = "v15 · 2026-07-25";
 
 const SRS = {
   GRADUATE_STEPS: 2,
@@ -1410,6 +1410,14 @@ function parseShowdownTeam(text) {
 
 const evsToString = (e) => [e.hp, e.atk, e.def, e.spa, e.spd, e.spe].join("/");
 
+/* "charizard-mega-y" -> "Mega Charizard Y" */
+function prettyMegaLabel(apiName, species) {
+  const parts = apiName.split("-");
+  const mi = parts.indexOf("mega");
+  const suffix = mi !== -1 ? parts.slice(mi + 1).map(s => s.toUpperCase()).join(" ") : "";
+  return `Mega ${species}${suffix ? " " + suffix : ""}`;
+}
+
 /* Turn parsed sets into pool-shaped Pokémon by pulling base stats and types
    from PokéAPI, plus base power for any move our meta data doesn't cover. */
 async function hydrateTeam(parsed, knownMoveData) {
@@ -1441,11 +1449,54 @@ async function hydrateTeam(parsed, knownMoveData) {
     }
     if (!api) { errors.push(set.species); continue; }
 
+    // A held Mega Stone means this set *can* mega evolve — it doesn't start
+    // that way. The base form stays primary and the Mega is attached as a
+    // possibility the games roll for. No stone means it never megas, even
+    // for a species that could.
+    let megaOf = null;
+    const stone = set.item && /ite(?: [XY])?$/i.test(set.item) && !/^eviolite$/i.test(set.item)
+      ? set.item : null;
+    if (stone) {
+      try {
+        const sp = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${slug0.split("-")[0]}`);
+        if (sp.ok) {
+          const sj = await sp.json();
+          const megas = (sj.varieties || []).map(v => v.pokemon.name).filter(n => n.includes("-mega"));
+          if (megas.length) {
+            // Charizardite X / Y (and Mewtwonite) pick a specific form
+            const suffix = (stone.match(/\s([XY])$/i) || [])[1];
+            const chosen = (suffix && megas.find(n => n.endsWith("-mega-" + suffix.toLowerCase()))) || megas[0];
+            const mr = await fetch(`https://pokeapi.co/api/v2/pokemon/${chosen}`);
+            if (mr.ok) megaOf = await mr.json();
+          }
+        }
+      } catch { /* offline — fall back to the base form */ }
+    }
     const stats = {};
     api.stats.forEach(s => {
       const k = { hp: "hp", attack: "atk", defense: "def", "special-attack": "spa", "special-defense": "spd", speed: "spe" }[s.stat.name];
       if (k) stats[k] = s.base_stat;
     });
+
+    // The Mega form, if this set is holding the right stone.
+    let megas = [];
+    if (megaOf) {
+      const mStats = {};
+      megaOf.stats.forEach(s => {
+        const k = { hp: "hp", attack: "atk", defense: "def", "special-attack": "spa", "special-defense": "spd", speed: "spe" }[s.stat.name];
+        if (k) mStats[k] = s.base_stat;
+      });
+      megas = [{
+        name: prettyMegaLabel(megaOf.name, set.species),
+        slug: megaOf.name,
+        types: megaOf.types.map(x => x.type.name),
+        stats: mStats,
+        // Mega forms force their own ability (Mega Mawile is always Huge Power)
+        ability: megaOf.abilities && megaOf.abilities.length
+          ? megaOf.abilities[0].ability.name.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+          : null,
+      }];
+    }
 
     mons.push({
       rank: i + 1,
@@ -1453,6 +1504,7 @@ async function hydrateTeam(parsed, knownMoveData) {
       nickname: set.nickname,
       slug: api.name,
       isTeam: true,
+      megas,
       types: api.types.map(x => x.type.name),
       stats,
       usage: null,
@@ -1497,6 +1549,17 @@ function hpStat(base, ev) {
 }
 const DAMAGE_CLASS_STAT = { physical: ["atk", "def"], special: ["spa", "spd"] };
 
+/* Abilities that null a whole damaging type outright. Conditional ones
+   (Bulletproof, Soundproof, Wind Rider) depend on move flags we don't
+   store, so they're deliberately left out. */
+const ABILITY_IMMUNITY = {
+  "Levitate": "ground", "Earth Eater": "ground",
+  "Flash Fire": "fire", "Well-Baked Body": "fire",
+  "Water Absorb": "water", "Storm Drain": "water", "Dry Skin": "water",
+  "Volt Absorb": "electric", "Lightning Rod": "electric", "Motor Drive": "electric",
+  "Sap Sipper": "grass",
+};
+
 /* opts: { atkItem, defItem, atkAbility, defAbility, atkNature, defNature,
           atkSpeEV..., weather } — all optional (base mode passes none). */
 function calcDamage(attacker, defender, move, opts = {}) {
@@ -1537,7 +1600,11 @@ function calcDamage(attacker, defender, move, opts = {}) {
       eff *= (m === undefined ? 1 : m);
     });
   }
-  if (eff === 0) return { min: 0, max: 0, eff, stab, immune: true };
+  if (eff === 0) return { min: 0, max: 0, eff, stab, immune: true, reason: "type" };
+  // Ability immunity (only meaningful when abilities are in play)
+  if (opts.defAbility && ABILITY_IMMUNITY[opts.defAbility] === move.type) {
+    return { min: 0, max: 0, eff, stab, immune: true, reason: opts.defAbility };
+  }
 
   // Weather (hard mode)
   let weatherMult = 1;
@@ -1575,6 +1642,7 @@ function calcDamage(attacker, defender, move, opts = {}) {
    the min–max roll span overlaps it. OHKO wins only if the MIN roll already
    kills (guaranteed KO), matching how players think about it. */
 const DMG_BUCKETS = [
+  { key: "immune", label: "No effect (0%)", lo: 0, hi: 0 },
   { key: "q1", label: "< 25%", lo: 0, hi: 25 },
   { key: "q2", label: "25–50%", lo: 25, hi: 50 },
   { key: "q3", label: "50–75%", lo: 50, hi: 75 },
@@ -1583,9 +1651,12 @@ const DMG_BUCKETS = [
 ];
 function bucketsForResult(res) {
   if (!res) return [];
+  // Type immunities (Ground vs Flying) and ability immunities (Levitate,
+  // Flash Fire…) have exactly one right answer.
+  if (res.immune) return ["immune"];
   const covered = new Set();
   if (res.max >= 100) covered.add("ohko");
-  DMG_BUCKETS.slice(0, 4).forEach(b => {
+  DMG_BUCKETS.filter(b => b.key !== "immune" && b.key !== "ohko").forEach(b => {
     // overlap between [min,max] capped at <100 and the bracket [lo,hi)
     const lo = Math.max(res.min, b.lo), hi = Math.min(res.max, b.hi);
     if (lo < hi && res.min < 100) covered.add(b.key);
@@ -1725,6 +1796,26 @@ function megaEntry(base, mega) {
     natures: base.natures,
   };
 }
+/* Imported sets holding a stone can mega evolve mid-battle, so each round
+   rolls for it rather than assuming either state. Returns the Mega variant
+   (flagged megaActive so the UI can say so) or the untouched base form. */
+function rollMegaState(m) {
+  if (!m || !m.isTeam) return m;
+  const g = (m.megas || [])[0];
+  if (!g || Math.random() < 0.5) return m;
+  return {
+    ...m,
+    name: g.name,
+    baseName: m.name,
+    slug: g.slug,
+    isMega: true,
+    megaActive: true,
+    types: g.types,
+    stats: g.stats,
+    abilities: g.ability ? [{ name: g.ability, pct: 100 }] : m.abilities,
+  };
+}
+
 /* A Mega is either a PokéAPI-expanded entry (isMega flag) or a ranked row
    whose name contains "Mega" as a word/segment (e.g. "Charizard-Mega-Y",
    "Mega Mawile") — but not Meganium or Yanmega. */
@@ -2258,11 +2349,7 @@ function ConfigScreen({ formats, generated, live, team, onImportTeam, onClearTea
     if (key === "natureQuiz") return true;
     if (key === "damage") {
       const md = { ...(reg.moveData || {}), ...((team && team.moveData) || {}) };
-      const srcPool = (
-        !hasTeam || matchSrc === "meta" ? pool
-        : matchSrc === "team" ? teamMons
-        : [...teamMons, ...pool]
-      );
+      const srcPool = (!hasTeam || matchSrc === "meta") ? pool : teamMons;
       const withStats = srcPool.filter(m => m.stats && m.types && m.types.length);
       const hasDmgMove = withStats.some(m => (m.moves || []).some(e => {
         const nm = typeof e === "string" ? e : e.name;
@@ -2292,6 +2379,16 @@ function ConfigScreen({ formats, generated, live, team, onImportTeam, onClearTea
   const duelPool = (
     effMatchSrc === "team" ? teamMons.filter(m => m.stats)
     : effMatchSrc === "teamVsMeta" ? [...teamMons.filter(m => m.stats), ...pool.filter(m => m.stats)]
+    : pool.filter(m => m.stats)
+  );
+  // Damage Buckets always attacks from the left. With a team loaded, that's
+  // your Pokémon; the meta side defends.
+  const dmgAtkPool = (
+    effMatchSrc === "meta" ? pool.filter(m => m.stats)
+    : teamMons.filter(m => m.stats)
+  );
+  const dmgDefPool = (
+    effMatchSrc === "team" ? teamMons.filter(m => m.stats)
     : pool.filter(m => m.stats)
   );
   const realAvailable = duelPool.some(m => m.builds && m.builds.length);
@@ -2793,7 +2890,8 @@ function ConfigScreen({ formats, generated, live, team, onImportTeam, onClearTea
         onClick={() => onStart(cat === "speed"
           ? { type: "duel", reg, pool: duelPool, duelCfg: { target: duelTarget, variant: duelVariant, hard: duelHard, buildStyle: duelBuild } }
           : cat === "damage"
-          ? { type: "damage", reg, pool: duelPool, dmgCfg: { target: duelTarget, hard: dmgHard },
+          ? { type: "damage", reg, pool: dmgAtkPool, defPool: dmgDefPool,
+              dmgCfg: { target: duelTarget, hard: dmgHard },
               moveData: { ...(reg.moveData || {}), ...((team && team.moveData) || {}) } }
           : { type: "flash", reg, pool, deckCfg: { mons: availableMons, count: effCount, skip: lo, cat: effCat, statKey, doShuffle: true, abilSkipMono }, mastery }
         )}
@@ -3694,10 +3792,10 @@ function Answer({ card, pool }) {
 
 function samplePair(pool, prevKey) {
   for (let tries = 0; tries < 20; tries++) {
-    const a = pool[Math.floor(Math.random() * pool.length)];
-    let b = pool[Math.floor(Math.random() * pool.length)];
-    if (a.name === b.name) continue;
-    const key = [a.name, b.name].sort().join("|");
+    const a = rollMegaState(pool[Math.floor(Math.random() * pool.length)]);
+    let b = rollMegaState(pool[Math.floor(Math.random() * pool.length)]);
+    if ((a.baseName || a.name) === (b.baseName || b.name)) continue;
+    const key = [a.baseName || a.name, b.baseName || b.name].sort().join("|");
     if (key === prevKey && tries < 15) continue;
     return { pair: [a, b], key };
   }
@@ -3896,8 +3994,8 @@ function applyBuildStyle(mons, mods, buildStyle, withItems) {
 function buildRound(pool, prevKey, hard, buildStyle) {
   let mons = pool.slice(0, 4), key = null;
   for (let tries = 0; tries < 30; tries++) {
-    mons = shuffle(pool).slice(0, 4);
-    key = mons.map(m => m.name).sort().join("|");
+    mons = shuffle(pool).slice(0, 4).map(rollMegaState);
+    key = mons.map(m => m.baseName || m.name).sort().join("|");
     if (key !== prevKey || tries >= 25) break;
   }
   const mods = {
@@ -4073,6 +4171,7 @@ function TurnOrderScreen({ pool, target, hard, buildStyle, onDone, onQuit }) {
     if (realIt && realIt !== "Choice Scarf") {
       chips.push(<ModChip key="ri" text={realIt} bg="#4A6FA5" />);
     }
+    if (mon.megaActive) chips.push(<ModChip key="mg" text="Mega" bg="#6F35FC" />);
     const border = !answered
       ? (pos !== -1 ? "var(--gold)" : "rgba(255,255,255,.14)")
       : wasRight ? "#30A46C" : "#E5484D";
@@ -4234,8 +4333,8 @@ function TurnOrderScreen({ pool, target, hard, buildStyle, onDone, onQuit }) {
 function buildScarfRound(pool, prevKey, hard, buildStyle) {
   let best = null;
   for (let attempt = 0; attempt < 40; attempt++) {
-    const mons = shuffle(pool).slice(0, 4);
-    const key = mons.map(m => m.name).sort().join("|");
+    const mons = shuffle(pool).slice(0, 4).map(rollMegaState);
+    const key = mons.map(m => m.baseName || m.name).sort().join("|");
     if (key === prevKey && attempt < 30) continue;
 
     const mods = {
@@ -4578,13 +4677,16 @@ function moveDataFor(md, name) {
 /* Build one damage question: random attacker + defender from the pool, a
    random damaging move the attacker actually runs. Returns null if it can't
    find a valid combo (caller retries). */
-function buildDamageRound(pool, moveData, prevKey, hard) {
-  const usable = pool.filter(m => m.stats && m.types && m.types.length);
+function buildDamageRound(atkPool, defPool, moveData, prevKey, hard) {
+  const usableAtk = atkPool.filter(m => m.stats && m.types && m.types.length);
+  const usableDef = (defPool || atkPool).filter(m => m.stats && m.types && m.types.length);
+  if (!usableAtk.length || !usableDef.length) return null;
+  const singleSided = usableDef.length === 1 && usableAtk.length === 1;
   for (let tries = 0; tries < 60; tries++) {
-    const attacker = usable[Math.floor(Math.random() * usable.length)];
-    const defender = usable[Math.floor(Math.random() * usable.length)];
-    if (attacker.name === defender.name) continue;
-    const key = attacker.name + ">" + defender.name;
+    const attacker = rollMegaState(usableAtk[Math.floor(Math.random() * usableAtk.length)]);
+    const defender = rollMegaState(usableDef[Math.floor(Math.random() * usableDef.length)]);
+    if (attacker.name === defender.name && !singleSided) continue;
+    const key = (attacker.baseName || attacker.name) + ">" + (defender.baseName || defender.name);
     if (key === prevKey && tries < 40) continue;
 
     const dmgMoves = (attacker.moves || [])
@@ -4624,6 +4726,7 @@ function buildDamageRound(pool, moveData, prevKey, hard) {
       const pickItem = (m) => {
         // Imported team members always use the exact item on their set.
         if (m.isTeam) return (m.teamSet && m.teamSet.item) || null;
+        if (m.megaActive) return null;
         if ((m.megas && m.isMega) || MEGA_NAME.test(m.name)) {
           return (m.items || []).map(norm).map(e => e.name).find(n => MEGA_STONE_RE.test(n) && n !== "Eviolite") || null;
         }
@@ -4643,8 +4746,8 @@ function buildDamageRound(pool, moveData, prevKey, hard) {
   return null;
 }
 
-function DamageScreen({ pool, moveData, target, hard, onDone, onQuit }) {
-  const [round, setRound] = useState(() => buildDamageRound(pool, moveData, null, hard));
+function DamageScreen({ pool, defPool, moveData, target, hard, onDone, onQuit }) {
+  const [round, setRound] = useState(() => buildDamageRound(pool, defPool, moveData, null, hard));
   const [picked, setPicked] = useState(null);
   const [wins, setWins] = useState(0);
   const [attempts, setAttempts] = useState(0);
@@ -4686,7 +4789,7 @@ function DamageScreen({ pool, moveData, target, hard, onDone, onQuit }) {
   const next = () => {
     if (wasRight && wins >= target) { onDone({ target, attempts, bestStreak }); return; }
     setPicked(null);
-    setRound(buildDamageRound(pool, moveData, round.key, hard));
+    setRound(buildDamageRound(pool, defPool, moveData, round.key, hard));
   };
 
   const rollText = res.immune
@@ -4715,11 +4818,19 @@ function DamageScreen({ pool, moveData, target, hard, onDone, onQuit }) {
             letterSpacing: ".06em", textTransform: "uppercase",
           }}>yours</span>
         )}
+        {m.megaActive && (
+          <span style={{
+            position: "absolute", bottom: -2, left: -4, background: "#6F35FC", color: "#fff",
+            borderRadius: 999, padding: "1px 7px", fontSize: 9, fontWeight: 900,
+            letterSpacing: ".06em", textTransform: "uppercase",
+            boxShadow: "0 0 10px rgba(111,53,252,.6)",
+          }}>mega</span>
+        )}
       </div>
       <div style={{
         fontFamily: "var(--display)", fontWeight: 800, fontSize: 16, lineHeight: 1.05,
         textTransform: "uppercase", textAlign: "center", overflowWrap: "anywhere", color: "#22243E",
-      }}>{m.nickname || m.name}</div>
+      }}>{m.megaActive ? m.name : (m.nickname || m.name)}</div>
       <div style={{ display: "flex", gap: 3, flexWrap: "wrap", justifyContent: "center" }}>
         {monTypes(m).filter(x => x !== "unknown").map(x => <TypeChip key={x} t={x} />)}
       </div>
@@ -4753,6 +4864,14 @@ function DamageScreen({ pool, moveData, target, hard, onDone, onQuit }) {
         background: "#F5F6FA", borderRadius: 18, padding: "18px 16px",
         boxShadow: "0 10px 30px rgba(0,0,0,.45)",
       }}>
+        <div style={{
+          display: "flex", justifyContent: "space-between", marginBottom: 6,
+          fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: ".14em",
+          textTransform: "uppercase", color: "#9DA0B8",
+        }}>
+          <span>{attacker.isTeam ? "Yours · attacking" : "Attacking"}</span>
+          <span>{defender.isTeam ? "Yours · defending" : "Defending"}</span>
+        </div>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
           {monBlock(attacker, "atk")}
           <div style={{
@@ -4821,7 +4940,9 @@ function DamageScreen({ pool, moveData, target, hard, onDone, onQuit }) {
               color: "#fff", fontSize: 14, lineHeight: 1.6, textAlign: "center",
             }}>
               <b>{wasRight ? "Correct!" : "Not quite."}</b>{" "}
-              {rollText}
+              {res.immune && res.reason && res.reason !== "type"
+                ? `No effect — ${defender.nickname || defender.name}'s ${res.reason} absorbs it`
+                : rollText}
               {res.eff != null && res.eff !== 1 && !res.immune && (
                 <span> · {res.eff > 1 ? `${res.eff}× super effective` : `${res.eff}× resisted`}</span>
               )}
@@ -5123,6 +5244,7 @@ function App() {
         <DamageScreen
           key={sessionId}
           pool={session.pool}
+          defPool={session.defPool}
           moveData={session.moveData}
           target={session.dmgCfg.target}
           hard={session.dmgCfg.hard}

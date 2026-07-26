@@ -54,7 +54,7 @@ re-drilling what you know.
 |-------|--------------|
 | Base Stat Quiz | Flip cards for one stat (default Speed, with speed-tier context on reveal) |
 | Speed Tier Simulator | 1v1 duels, 2v2 turn order, or Find the Scarf (the move order is shown — drag the Scarf onto the hidden holder; rounds regenerate until the answer is unique). A three-way Speed Math selector applies to turn order and scarf hunt: Base stats, ± Spe natures (random ×1.1/×0.9 dealt each round), or Real builds (L50 speed from each mon's top EV spread — assumed formula ⌊(2×base+31)/2⌋+5+EV — plus, in turn order, a random real held item from its >10%-usage items shown as a chip; Choice Scarf ×1.5 and Iron Ball ×0.5 affect the math, Megas only ever hold their stone, and real natures slot in automatically once the data source is fixed). Win targets, streaks, and an optional Hard Mode (Scarf ×1.5, Tailwind ×2, PAR ×0.5, weather + Swift Swim/Chlorophyll/Sand Rush/Slush Rush ×2, Trick Room reversal, optional ±Spe natures). Weather setters put their weather up 50% of the time. |
-| Damage Buckets | Two random meta Pokémon face off with a random damaging move the attacker runs; call how much of the defender's HP it takes — <25 / 25-50 / 50-75 / 75-99 / OHKO. The 85-100% roll spread means a straddling result accepts either bracket. Base mode uses base stats only; Hard mode layers real EV spreads, held items, abilities, and (once fixed) natures. Needs move base-power data from the nightly pull. |
+| Damage Buckets | Two random meta Pokémon face off with a random damaging move the attacker runs; call how much of the defender's HP it takes — No effect / <25 / 25-50 / 50-75 / 75-99 / OHKO. Type immunities (and, in hard mode, ability immunities like Levitate and Flash Fire) resolve to *No effect*. The 85-100% roll spread means a straddling result accepts either bracket. Base mode uses base stats only; Hard mode layers real EV spreads, held items, abilities, and (once fixed) natures. Needs move base-power data from the nightly pull. |
 | Common Movesets Quiz | The mon's tracked moves, shuffled — select every move over 30% usage |
 | Common Items Quiz | 8 items (the mon's own + distractors from other mons) — select everything over 10% usage. Mega form entries are excluded (they can only hold their stone), and Mega Stones never appear as distractors |
 | Common Builds Quiz | Multiple choice — pick the mon's real most-common build (nature + EV spread) among builds borrowed from other meta mons. While Pikalytics' nature field is blank (reported bug), options show the EV spread alone and natures slot in automatically once fixed |
@@ -96,7 +96,14 @@ Once a team is loaded, the **Speed Tier Simulator** and **Damage Buckets**
 gain a *Matchups from* selector: meta only, your team + meta, or your team
 only. Your Pokémon keep their real set in hard mode — the exact item,
 ability, nature, and EV spread from the paste, rather than randomised
-meta values — and are badged "yours" in matchups.
+meta values — and are badged "yours" in matchups. In Damage Buckets your
+Pokémon always attacks from the left. A set holding a Mega Stone *can* mega
+evolve, so each round rolls for it — roughly half the time it appears in
+its Mega form (Mega stats, typing, and forced ability, with Charizardite
+X/Y picking the right form), marked with a purple **Mega** badge, and
+otherwise it stays in base form. A set without a stone never megas, even
+if the species could. This applies to both Damage Buckets and the Speed
+Tier Simulator, since both numbers change a lot between forms.
 
 The team persists between visits where browser storage is available; in
 the chat-artifact preview storage is blocked, so it lasts for the session.
