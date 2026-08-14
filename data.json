@@ -1,5 +1,5 @@
 {
- "generated": "2026-08-13",
+ "generated": "2026-08-14",
  "note": "Auto-refreshed nightly from Pikalytics by GitHub Action.",
  "formats": [
   {
@@ -114,7 +114,7 @@
        "pct": 32.7
       }
      ],
-     "winrate": 49.49,
+     "winrate": 48.05,
      "megas": [
       {
        "name": "Mega Garchomp",
@@ -253,7 +253,7 @@
        "pct": 20.5
       }
      ],
-     "winrate": 48.981
+     "winrate": 48.584
     },
     {
      "rank": 3,
@@ -361,7 +361,7 @@
        "pct": 33.3
       }
      ],
-     "winrate": 50.949
+     "winrate": 50.82
     },
     {
      "rank": 4,
@@ -469,7 +469,7 @@
        "pct": 50.7
       }
      ],
-     "winrate": 48.372
+     "winrate": 48.598
     },
     {
      "rank": 5,
@@ -573,7 +573,7 @@
        "pct": 13.7
       }
      ],
-     "winrate": 52.024
+     "winrate": 51.397
     },
     {
      "rank": 6,
@@ -673,7 +673,7 @@
        "pct": 20.1
       }
      ],
-     "winrate": 49.538,
+     "winrate": 49.369,
      "megas": [
       {
        "name": "Mega Staraptor",
@@ -796,7 +796,7 @@
        "pct": 6.2
       }
      ],
-     "winrate": 49.541
+     "winrate": 48.189
     },
     {
      "rank": 8,
@@ -892,7 +892,7 @@
        "pct": 20.9
       }
      ],
-     "winrate": 51.006,
+     "winrate": 49.5,
      "megas": [
       {
        "name": "Mega Charizard X",
@@ -1031,7 +1031,7 @@
        "pct": 43.3
       }
      ],
-     "winrate": 44.996,
+     "winrate": 48.411,
      "megas": [
       {
        "name": "Mega Raichu X",
@@ -1169,7 +1169,7 @@
        "pct": 30.6
       }
      ],
-     "winrate": 49.369
+     "winrate": 48.555
     },
     {
      "rank": 11,
@@ -1277,7 +1277,7 @@
        "pct": 48.2
       }
      ],
-     "winrate": 49.705
+     "winrate": 48.324
     },
     {
      "rank": 12,
@@ -1385,7 +1385,7 @@
        "pct": 8.2
       }
      ],
-     "winrate": 50.145
+     "winrate": 48.812
     },
     {
      "rank": 13,
@@ -1493,7 +1493,7 @@
        "pct": 12.4
       }
      ],
-     "winrate": 49.106
+     "winrate": 48.277
     },
     {
      "rank": 14,
@@ -1596,7 +1596,7 @@
        "pct": 10.5
       }
      ],
-     "winrate": 48.022
+     "winrate": 47.711
     },
     {
      "rank": 15,
@@ -1700,7 +1700,7 @@
        "pct": 30.6
       }
      ],
-     "winrate": 49.472,
+     "winrate": 48.841,
      "megas": [
       {
        "name": "Mega Swampert",
@@ -1823,7 +1823,7 @@
        "pct": 25.7
       }
      ],
-     "winrate": 47.106,
+     "winrate": 45.423,
      "megas": [
       {
        "name": "Mega Metagross",
@@ -1950,7 +1950,7 @@
        "pct": 7.4
       }
      ],
-     "winrate": 48.343
+     "winrate": 47.26
     },
     {
      "rank": 18,
@@ -2037,7 +2037,7 @@
        "pct": 24.2
       }
      ],
-     "winrate": 54.173,
+     "winrate": 54.845,
      "megas": [
       {
        "name": "Mega Floette",
@@ -2155,7 +2155,7 @@
        "pct": 28.6
       }
      ],
-     "winrate": 50.596
+     "winrate": 48.365
     },
     {
      "rank": 20,
@@ -2263,7 +2263,7 @@
        "pct": 39.5
       }
      ],
-     "winrate": 49.168,
+     "winrate": 46.63,
      "megas": [
       {
        "name": "Mega Aerodactyl",
@@ -2389,7 +2389,7 @@
        "pct": 16.5
       }
      ],
-     "winrate": 47.203
+     "winrate": 47.279
     },
     {
      "rank": 22,
@@ -2497,7 +2497,7 @@
        "pct": 12.8
       }
      ],
-     "winrate": 49.11
+     "winrate": 49.752
     },
     {
      "rank": 23,
@@ -2601,7 +2601,7 @@
        "pct": 33.5
       }
      ],
-     "winrate": 45.074,
+     "winrate": 42.491,
      "megas": [
       {
        "name": "Mega Sableye",
@@ -2700,7 +2700,7 @@
        "pct": 45.8
       }
      ],
-     "winrate": 45.912,
+     "winrate": 45.389,
      "megas": [
       {
        "name": "Mega Mawile",
@@ -2823,7 +2823,7 @@
        "pct": 33.8
       }
      ],
-     "winrate": 49.415
+     "winrate": 48.087
     },
     {
      "rank": 26,
@@ -2930,7 +2930,7 @@
        "pct": 42.1
       }
      ],
-     "winrate": 45.671
+     "winrate": 44.602
     },
     {
      "rank": 27,
@@ -3018,7 +3018,7 @@
        "pct": 21.5
       }
      ],
-     "winrate": 50.201,
+     "winrate": 50.834,
      "megas": [
       {
        "name": "Mega Froslass",
@@ -3141,7 +3141,7 @@
        "pct": 52.1
       }
      ],
-     "winrate": 48.424
+     "winrate": 48.36
     },
     {
      "rank": 29,
@@ -3241,7 +3241,7 @@
        "pct": 8
       }
      ],
-     "winrate": 46.013
+     "winrate": 43.768
     },
     {
      "rank": 30,
@@ -3345,7 +3345,7 @@
        "pct": 51.9
       }
      ],
-     "winrate": 50.852,
+     "winrate": 51.133,
      "megas": [
       {
        "name": "Mega Glimmora",
@@ -3448,7 +3448,7 @@
        "pct": 15.2
       }
      ],
-     "winrate": 50.674,
+     "winrate": 50.293,
      "megas": [
       {
        "name": "Mega Delphox",
@@ -3571,7 +3571,7 @@
        "pct": 31.9
       }
      ],
-     "winrate": 49.878,
+     "winrate": 49.962,
      "megas": [
       {
        "name": "Mega Dragonite",
@@ -3694,7 +3694,7 @@
        "pct": 15
       }
      ],
-     "winrate": 49.716,
+     "winrate": 48.652,
      "megas": [
       {
        "name": "Mega Tyranitar",
@@ -3804,7 +3804,7 @@
        "pct": 21.4
       }
      ],
-     "winrate": 50.994,
+     "winrate": 47.819,
      "megas": [
       {
        "name": "Mega Blastoise",
@@ -3929,7 +3929,7 @@
        "pct": 9.8
       }
      ],
-     "winrate": 49.582
+     "winrate": 49.427
     },
     {
      "rank": 36,
@@ -4033,7 +4033,7 @@
        "pct": 27.2
       }
      ],
-     "winrate": 51.381,
+     "winrate": 49.886,
      "megas": [
       {
        "name": "Mega Venusaur",
@@ -4152,7 +4152,7 @@
        "pct": 57.4
       }
      ],
-     "winrate": 51.211
+     "winrate": 48.479
     },
     {
      "rank": 38,
@@ -4255,7 +4255,7 @@
        "pct": 16.5
       }
      ],
-     "winrate": 49.295
+     "winrate": 48.474
     },
     {
      "rank": 39,
@@ -4358,7 +4358,7 @@
        "pct": 28.6
       }
      ],
-     "winrate": 47.145
+     "winrate": 46.568
     },
     {
      "rank": 40,
@@ -4450,7 +4450,7 @@
        "pct": 20.2
       }
      ],
-     "winrate": 48.939,
+     "winrate": 47.91,
      "megas": [
       {
        "name": "Mega Gengar",
@@ -4572,7 +4572,7 @@
        "pct": 37.2
       }
      ],
-     "winrate": 48.952,
+     "winrate": 45.973,
      "megas": [
       {
        "name": "Mega Kangaskhan",
@@ -4670,7 +4670,7 @@
        "pct": 52
       }
      ],
-     "winrate": 46.504,
+     "winrate": 43.265,
      "megas": [
       {
        "name": "Mega Pyroar",
@@ -4789,7 +4789,7 @@
        "pct": 19.8
       }
      ],
-     "winrate": 48.595,
+     "winrate": 48.837,
      "megas": [
       {
        "name": "Mega Gardevoir",
@@ -4912,7 +4912,7 @@
        "pct": 8.2
       }
      ],
-     "winrate": 43.39
+     "winrate": 46.433
     },
     {
      "rank": 45,
@@ -5020,7 +5020,7 @@
        "pct": 23.2
       }
      ],
-     "winrate": 45.298,
+     "winrate": 44.125,
      "megas": [
       {
        "name": "Mega Scrafty",
@@ -5131,7 +5131,7 @@
        "pct": 28.1
       }
      ],
-     "winrate": 50.553
+     "winrate": 49.531
     },
     {
      "rank": 47,
@@ -5206,7 +5206,7 @@
        "pct": 5.6
       }
      ],
-     "winrate": 37.287,
+     "winrate": 35.27,
      "megas": [
       {
        "name": "Mega Eelektross",
@@ -5316,7 +5316,7 @@
        "pct": 27.8
       }
      ],
-     "winrate": 52.962,
+     "winrate": 52.732,
      "megas": [
       {
        "name": "Mega Scovillain",
@@ -5439,7 +5439,7 @@
        "pct": 8.4
       }
      ],
-     "winrate": 44.543
+     "winrate": 45.408
     },
     {
      "rank": 50,
@@ -5543,7 +5543,7 @@
        "pct": 16.4
       }
      ],
-     "winrate": 49.842
+     "winrate": 46.426
     }
    ],
    "moveData": {
