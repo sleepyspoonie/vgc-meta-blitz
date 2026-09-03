@@ -1,5 +1,5 @@
 {
- "generated": "2026-09-02",
+ "generated": "2026-09-03",
  "note": "Auto-refreshed nightly from Pikalytics by GitHub Action.",
  "formats": [
   {
@@ -147,7 +147,7 @@
         "spd": 85,
         "spe": 151
        },
-       "ability": null
+       "ability": "Levitate"
       }
      ]
     },
@@ -6704,7 +6704,7 @@
         "spd": 85,
         "spe": 151
        },
-       "ability": null
+       "ability": "Levitate"
       }
      ]
     },
